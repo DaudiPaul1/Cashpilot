@@ -1,0 +1,191 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isValidUserProfile() {
+      let profile = request.resource.data;
+      return profile.keys().hasAll(['uid', 'email', 'displayName', 'companyName', 'role', 'subscription', 'integrations', 'settings', 'createdAt', 'updatedAt']) &&
+        profile.uid is string &&
+        profile.email is string &&
+        profile.displayName is string &&
+        profile.companyName is string &&
+        profile.role in ['admin', 'user'] &&
+        profile.subscription is map &&
+        profile.integrations is map &&
+        profile.settings is map &&
+        profile.createdAt is timestamp &&
+        profile.updatedAt is timestamp;
+    }
+    
+    function isValidTransaction() {
+      let transaction = request.resource.data;
+      return transaction.keys().hasAll(['userId', 'date', 'amount', 'currency', 'description', 'category', 'type', 'source', 'status', 'tags', 'attachments', 'createdAt', 'updatedAt']) &&
+        transaction.userId is string &&
+        transaction.date is timestamp &&
+        transaction.amount is number &&
+        transaction.currency is string &&
+        transaction.description is string &&
+        transaction.category is string &&
+        transaction.type in ['income', 'expense', 'transfer'] &&
+        transaction.source in ['manual', 'shopify', 'quickbooks', 'plaid'] &&
+        transaction.status in ['pending', 'completed', 'failed'] &&
+        transaction.tags is list &&
+        transaction.attachments is list &&
+        transaction.createdAt is timestamp &&
+        transaction.updatedAt is timestamp;
+    }
+    
+    function isValidKPIs() {
+      let kpis = request.resource.data;
+      return kpis.keys().hasAll(['accountsReceivable', 'accountsPayable', 'netCashFlow', 'cashRunway', 'lastUpdated']) &&
+        kpis.accountsReceivable is number &&
+        kpis.accountsPayable is number &&
+        kpis.netCashFlow is number &&
+        kpis.cashRunway is number &&
+        kpis.lastUpdated is timestamp;
+    }
+    
+    function isValidInsight() {
+      let insight = request.resource.data;
+      return insight.keys().hasAll(['userId', 'type', 'title', 'content', 'score', 'priority', 'actionable', 'actionItems', 'metadata', 'createdAt']) &&
+        insight.userId is string &&
+        insight.type in ['health_score', 'payment_reminder', 'expense_optimization', 'growth_opportunity'] &&
+        insight.title is string &&
+        insight.content is string &&
+        insight.score is number &&
+        insight.score >= 0 && insight.score <= 100 &&
+        insight.priority in ['low', 'medium', 'high', 'critical'] &&
+        insight.actionable is bool &&
+        insight.actionItems is list &&
+        insight.metadata is map &&
+        insight.createdAt is timestamp;
+    }
+
+    // User profiles - users can only access their own profile
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && isOwner(userId);
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUserProfile();
+      allow update: if isAuthenticated() && isOwner(userId) && isValidUserProfile();
+      allow delete: if false; // Don't allow user deletion for MVP
+    }
+    
+    // Transactions - users can only access their own transactions
+    match /transactions/{transactionId} {
+      allow read, write: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid && 
+        isValidTransaction();
+      allow update: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid && 
+        request.resource.data.userId == request.auth.uid && 
+        isValidTransaction();
+      allow delete: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // KPIs - users can only access their own KPIs
+    match /kpis/{userId} {
+      allow read, write: if isAuthenticated() && isOwner(userId);
+      allow create: if isAuthenticated() && isOwner(userId) && isValidKPIs();
+      allow update: if isAuthenticated() && isOwner(userId) && isValidKPIs();
+      allow delete: if false; // Don't allow KPI deletion for MVP
+    }
+    
+    // AI Insights - users can only access their own insights
+    match /insights/{insightId} {
+      allow read, write: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid && 
+        isValidInsight();
+      allow update: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid && 
+        request.resource.data.userId == request.auth.uid && 
+        isValidInsight();
+      allow delete: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // Cash flow forecasts - users can only access their own forecasts
+    match /forecasts/{forecastId} {
+      allow read, write: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid && 
+        request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // Financial health scores - users can only access their own scores
+    match /health-scores/{scoreId} {
+      allow read, write: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid && 
+        request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // Integration settings - users can only access their own integrations
+    match /integrations/{integrationId} {
+      allow read, write: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid && 
+        request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // Dashboard widgets - users can only access their own widgets
+    match /widgets/{widgetId} {
+      allow read, write: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid && 
+        request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // System settings - only admins can access
+    match /system/{document=**} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Analytics data - users can only access their own analytics
+    match /analytics/{userId}/{document=**} {
+      allow read, write: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
