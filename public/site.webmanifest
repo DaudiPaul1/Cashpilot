@@ -1,0 +1,16 @@
+{
+  "name": "CashPilot - AI-Powered Financial Dashboard",
+  "short_name": "CashPilot",
+  "description": "Intelligent financial management platform for small businesses",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}
