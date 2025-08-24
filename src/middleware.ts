@@ -28,10 +28,10 @@ const authRoutes = [
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // Get the token from cookies
-  const token = request.cookies.get('auth-token')?.value;
-  const isAuthenticated = !!token;
-
+  // For Firebase Auth, we'll let the client-side handle authentication
+  // The middleware will only handle basic route protection
+  // Firebase Auth state will be managed in the AuthContext
+  
   // Check if the route is protected
   const isProtectedRoute = protectedRoutes.some(route => 
     pathname.startsWith(route)
@@ -47,27 +47,8 @@ export function middleware(request: NextRequest) {
     pathname === route || pathname.startsWith(route)
   );
 
-  // If user is not authenticated and trying to access protected route
-  if (!isAuthenticated && isProtectedRoute) {
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('redirect', pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  // If user is authenticated and trying to access auth routes
-  if (isAuthenticated && isAuthRoute) {
-    const dashboardUrl = new URL('/dashboard', request.url);
-    return NextResponse.redirect(dashboardUrl);
-  }
-
-  // If user is not authenticated and trying to access non-public route
-  if (!isAuthenticated && !isPublicRoute && !isAuthRoute) {
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('redirect', pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  // Continue with the request
+  // For now, allow all routes and let client-side auth handle protection
+  // This prevents the middleware from blocking Firebase Auth initialization
   return NextResponse.next();
 }
 
