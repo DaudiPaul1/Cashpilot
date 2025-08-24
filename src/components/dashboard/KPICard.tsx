@@ -1,15 +1,19 @@
 'use client';
 
+import { ReactNode } from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import { Tooltip } from '@/components/ui/Tooltip';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 interface KPICardProps {
   title: string;
-  value: string | number;
+  value: string;
   change?: number;
   changeType?: 'positive' | 'negative' | 'neutral';
-  icon?: React.ReactNode;
-  format?: 'currency' | 'percentage' | 'number' | 'text';
+  icon: ReactNode;
+  format: 'currency' | 'text' | 'percentage';
   loading?: boolean;
+  tooltip?: string;
 }
 
 export default function KPICard({
@@ -18,11 +22,12 @@ export default function KPICard({
   change,
   changeType = 'neutral',
   icon,
-  format = 'text',
-  loading = false
+  format,
+  loading = false,
+  tooltip
 }: KPICardProps) {
-  const getChangeColor = (type: string) => {
-    switch (type) {
+  const getChangeColor = () => {
+    switch (changeType) {
       case 'positive':
         return 'text-green-600';
       case 'negative':
@@ -32,8 +37,8 @@ export default function KPICard({
     }
   };
 
-  const getChangeIcon = (type: string) => {
-    switch (type) {
+  const getChangeIcon = () => {
+    switch (changeType) {
       case 'positive':
         return <TrendingUp className="h-4 w-4" />;
       case 'negative':
@@ -43,66 +48,47 @@ export default function KPICard({
     }
   };
 
-  const formatValue = (val: string | number) => {
-    if (typeof val === 'number') {
-      switch (format) {
-        case 'currency':
-          return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD'
-          }).format(val);
-        case 'percentage':
-          return `${val.toFixed(1)}%`;
-        case 'number':
-          return new Intl.NumberFormat('en-US').format(val);
-        default:
-          return val.toString();
-      }
-    }
-    return val;
+  const formatChange = (change: number) => {
+    const prefix = change >= 0 ? '+' : '';
+    return `${prefix}${change.toFixed(1)}%`;
   };
 
-  if (loading) {
-    return (
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <div className="animate-pulse">
-          <div className="flex items-center justify-between mb-4">
-            <div className="h-4 bg-gray-200 rounded w-24"></div>
-            <div className="h-6 w-6 bg-gray-200 rounded"></div>
-          </div>
-          <div className="h-8 bg-gray-200 rounded w-32 mb-2"></div>
-          <div className="h-4 bg-gray-200 rounded w-16"></div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
+  const cardContent = (
     <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-gray-600">{title}</h3>
-        {icon && (
-          <div className="h-8 w-8 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600">
-            {icon}
+      <div className="flex items-center justify-between">
+        <div className="flex-1">
+          <div className="flex items-center mb-2">
+            {tooltip ? (
+              <Tooltip content={tooltip}>
+                <p className="text-sm font-medium text-gray-600">{title}</p>
+              </Tooltip>
+            ) : (
+              <p className="text-sm font-medium text-gray-600">{title}</p>
+            )}
           </div>
-        )}
-      </div>
-      
-      <div className="mb-2">
-        <p className="text-2xl font-bold text-gray-900">
-          {formatValue(value)}
-        </p>
-      </div>
-      
-      {change !== undefined && (
-        <div className={`flex items-center text-sm ${getChangeColor(changeType)}`}>
-          {getChangeIcon(changeType)}
-          <span className="ml-1 font-medium">
-            {change > 0 ? '+' : ''}{change.toFixed(1)}%
-          </span>
-          <span className="ml-1 text-gray-500">vs last month</span>
+          {loading ? (
+            <div className="flex items-center space-x-2">
+              <LoadingSpinner size="sm" />
+              <span className="text-gray-400">Loading...</span>
+            </div>
+          ) : (
+            <p className="text-2xl font-bold text-gray-900">{value}</p>
+          )}
+          {change !== undefined && changeType !== 'neutral' && (
+            <p className={`text-sm flex items-center mt-1 ${getChangeColor()}`}>
+              {getChangeIcon()}
+              <span className="ml-1">
+                {formatChange(change)} vs last month
+              </span>
+            </p>
+          )}
         </div>
-      )}
+        <div className="h-12 w-12 bg-gray-100 rounded-lg flex items-center justify-center">
+          {icon}
+        </div>
+      </div>
     </div>
   );
+
+  return cardContent;
 }

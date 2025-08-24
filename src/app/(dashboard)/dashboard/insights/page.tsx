@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/store/useStore';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { Tooltip } from '@/components/ui/Tooltip';
 import { 
   Lightbulb, 
   TrendingUp, 
@@ -12,7 +13,10 @@ import {
   Clock,
   RefreshCw,
   Target,
-  Zap
+  Zap,
+  DollarSign,
+  Users,
+  Calendar
 } from 'lucide-react';
 
 export default function InsightsPage() {
@@ -35,22 +39,28 @@ export default function InsightsPage() {
         setLoading('insights', true);
         setError('insights', null);
 
-        // Mock insights data
+        // Mock insights data tailored for small businesses
         const mockInsights = [
           {
             id: '1',
             userId: user.uid,
             type: 'health_score' as const,
             title: 'Strong Financial Health',
-            content: 'Your cash flow is positive and you have a healthy runway. Consider investing in growth opportunities.',
+            content: 'Your business is making more money than it\'s spending. Consider investing in marketing or new equipment to grow faster.',
             score: 85,
             priority: 'low' as const,
             actionable: true,
             actionItems: [
               {
                 id: '1',
-                title: 'Review investment opportunities',
-                description: 'Consider allocating some cash to growth initiatives',
+                title: 'Increase marketing budget',
+                description: 'Allocate $2,000 more to marketing this month to attract new customers',
+                completed: false
+              },
+              {
+                id: '2',
+                title: 'Review pricing strategy',
+                description: 'Your profit margins suggest you could raise prices by 5-10%',
                 completed: false
               }
             ],
@@ -66,15 +76,21 @@ export default function InsightsPage() {
             userId: user.uid,
             type: 'expense_optimization' as const,
             title: 'High Technology Expenses',
-            content: 'Your technology expenses are 35% of total costs. Consider reviewing software subscriptions.',
+            content: 'You\'re spending 35% of your budget on technology. Some software might be unused or overpriced.',
             score: 65,
             priority: 'medium' as const,
             actionable: true,
             actionItems: [
               {
-                id: '2',
+                id: '3',
                 title: 'Audit software subscriptions',
-                description: 'Review and cancel unused software subscriptions',
+                description: 'Cancel unused tools and negotiate better rates for essential software',
+                completed: false
+              },
+              {
+                id: '4',
+                title: 'Consider annual billing',
+                description: 'Switch to annual plans to save 10-20% on software costs',
                 completed: false
               }
             ],
@@ -89,22 +105,58 @@ export default function InsightsPage() {
             id: '3',
             userId: user.uid,
             type: 'growth_opportunity' as const,
-            title: 'Revenue Growth Opportunity',
-            content: 'Your client payment cycle is excellent. Consider expanding to new markets.',
+            title: 'Excellent Payment Cycle',
+            content: 'Your customers pay quickly (12.5 days average). This is excellent! Consider offering payment plans to increase sales.',
             score: 90,
             priority: 'high' as const,
             actionable: true,
             actionItems: [
               {
-                id: '3',
-                title: 'Market expansion research',
-                description: 'Research potential new markets for expansion',
+                id: '5',
+                title: 'Offer payment plans',
+                description: 'Introduce 3-month payment plans to increase average order value',
+                completed: false
+              },
+              {
+                id: '6',
+                title: 'Ask for referrals',
+                description: 'Your happy customers can bring in new business - ask them for referrals',
                 completed: false
               }
             ],
             metadata: {
               paymentCycle: 12.5,
               growthPotential: 'high'
+            },
+            createdAt: new Date(),
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+          },
+          {
+            id: '4',
+            userId: user.uid,
+            type: 'payment_reminder' as const,
+            title: 'Invoice Follow-up Required',
+            content: 'You have $15,000 in overdue invoices. Following up on these can improve your cash flow immediately.',
+            score: 75,
+            priority: 'high' as const,
+            actionable: true,
+            actionItems: [
+              {
+                id: '7',
+                title: 'Send payment reminders',
+                description: 'Contact customers with overdue invoices (30+ days)',
+                completed: false
+              },
+              {
+                id: '8',
+                title: 'Review payment terms',
+                description: 'Consider shorter payment terms (15 days instead of 30)',
+                completed: false
+              }
+            ],
+            metadata: {
+              overdueAmount: 15000,
+              overdueCount: 3
             },
             createdAt: new Date(),
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
@@ -165,7 +217,11 @@ export default function InsightsPage() {
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Insights</p>
+                <div className="flex items-center mb-2">
+                  <Tooltip content="Total number of insights available to help improve your business performance.">
+                    <p className="text-sm font-medium text-gray-600">Available Insights</p>
+                  </Tooltip>
+                </div>
                 <p className="text-2xl font-bold text-gray-900">{insights.length}</p>
               </div>
               <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -177,9 +233,13 @@ export default function InsightsPage() {
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Actionable Items</p>
+                <div className="flex items-center mb-2">
+                  <Tooltip content="Number of actionable steps you can take to improve your business right now.">
+                    <p className="text-sm font-medium text-gray-600">Action Items</p>
+                  </Tooltip>
+                </div>
                 <p className="text-2xl font-bold text-gray-900">
-                  {insights.filter(i => i.actionable).length}
+                  {insights.filter(i => i.actionable).reduce((sum, i) => sum + i.actionItems.length, 0)}
                 </p>
               </div>
               <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -191,7 +251,11 @@ export default function InsightsPage() {
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Avg. Score</p>
+                <div className="flex items-center mb-2">
+                  <Tooltip content="Overall business health score based on your financial performance and growth potential.">
+                    <p className="text-sm font-medium text-gray-600">Business Score</p>
+                  </Tooltip>
+                </div>
                 <p className="text-2xl font-bold text-gray-900">
                   {insights.length > 0 
                     ? Math.round(insights.reduce((sum, i) => sum + i.score, 0) / insights.length)
@@ -252,18 +316,18 @@ export default function InsightsPage() {
 
                 {insight.actionable && insight.actionItems.length > 0 && (
                   <div className="border-t border-gray-200 pt-4">
-                    <h4 className="text-sm font-medium text-gray-900 mb-3">Action Items:</h4>
-                    <div className="space-y-2">
+                    <h4 className="text-sm font-medium text-gray-900 mb-3">What You Can Do:</h4>
+                    <div className="space-y-3">
                       {insight.actionItems.map((action) => (
-                        <div key={action.id} className="flex items-center space-x-3">
+                        <div key={action.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
                           <input
                             type="checkbox"
                             checked={action.completed}
-                            className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                            className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 mt-0.5"
                           />
-                          <div>
+                          <div className="flex-1">
                             <p className="text-sm font-medium text-gray-900">{action.title}</p>
-                            <p className="text-xs text-gray-500">{action.description}</p>
+                            <p className="text-xs text-gray-500 mt-1">{action.description}</p>
                           </div>
                         </div>
                       ))}

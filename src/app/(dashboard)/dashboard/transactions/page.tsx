@@ -4,16 +4,17 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/store/useStore';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { Tooltip } from '@/components/ui/Tooltip';
 import { 
-  CreditCard, 
-  Plus, 
-  Filter, 
   Search, 
-  Download,
-  Calendar,
+  Filter, 
+  Download, 
+  Plus,
   DollarSign,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  Calendar,
+  RefreshCw
 } from 'lucide-react';
 
 export default function TransactionsPage() {
@@ -28,8 +29,8 @@ export default function TransactionsPage() {
   } = useData();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedType, setSelectedType] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedType, setSelectedType] = useState('all');
 
   // Load transactions data
   useEffect(() => {
@@ -94,17 +95,33 @@ export default function TransactionsPage() {
             id: '4',
             userId: user.uid,
             date: new Date('2024-01-12'),
-            amount: 18000,
+            amount: 8000,
             currency: 'USD',
-            description: 'Client Payment - Project Beta',
+            description: 'Consulting Services',
             category: 'Income',
             type: 'income' as const,
             source: 'manual' as const,
             status: 'completed' as const,
-            tags: ['client', 'project'],
+            tags: ['consulting', 'services'],
             attachments: [],
             createdAt: new Date('2024-01-12'),
             updatedAt: new Date('2024-01-12')
+          },
+          {
+            id: '5',
+            userId: user.uid,
+            date: new Date('2024-01-11'),
+            amount: 1200,
+            currency: 'USD',
+            description: 'Marketing Campaign',
+            category: 'Marketing',
+            type: 'expense' as const,
+            source: 'manual' as const,
+            status: 'completed' as const,
+            tags: ['marketing', 'campaign'],
+            attachments: [],
+            createdAt: new Date('2024-01-11'),
+            updatedAt: new Date('2024-01-11')
           }
         ];
 
@@ -131,36 +148,32 @@ export default function TransactionsPage() {
 
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('en-US', {
-      year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
+      year: 'numeric'
     }).format(date);
   };
 
-  const getTypeIcon = (type: string) => {
-    return type === 'income' ? (
-      <TrendingUp className="h-4 w-4 text-green-600" />
-    ) : (
-      <TrendingDown className="h-4 w-4 text-red-600" />
-    );
-  };
-
-  const filteredTransactions = transactions.filter(transaction => {
-    const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         transaction.category.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = selectedType === 'all' || transaction.type === selectedType;
-    const matchesCategory = selectedCategory === 'all' || transaction.category === selectedCategory;
-    
-    return matchesSearch && matchesType && matchesCategory;
-  });
-
-  const totalIncome = filteredTransactions
+  // Calculate summary metrics
+  const totalIncome = transactions
     .filter(t => t.type === 'income')
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const totalExpenses = filteredTransactions
+  const totalExpenses = transactions
     .filter(t => t.type === 'expense')
     .reduce((sum, t) => sum + t.amount, 0);
+
+  const netCashFlow = totalIncome - totalExpenses;
+
+  // Filter transactions
+  const filteredTransactions = transactions.filter(transaction => {
+    const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         transaction.category.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === 'all' || transaction.category === selectedCategory;
+    const matchesType = selectedType === 'all' || transaction.type === selectedType;
+    
+    return matchesSearch && matchesCategory && matchesType;
+  });
 
   return (
     <DashboardLayout>
@@ -169,9 +182,9 @@ export default function TransactionsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
-            <p className="text-gray-600">Manage and track your financial transactions.</p>
+            <p className="text-gray-600">Track all your business income and expenses in one place.</p>
           </div>
-          <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
             <Plus className="h-4 w-4 mr-2" />
             Add Transaction
           </button>
@@ -182,11 +195,19 @@ export default function TransactionsPage() {
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Income</p>
+                <div className="flex items-center mb-2">
+                  <Tooltip content="Money coming in - total money your business earned this month from all sources.">
+                    <p className="text-sm font-medium text-gray-600">Total Income</p>
+                  </Tooltip>
+                </div>
                 <p className="text-2xl font-bold text-green-600">{formatCurrency(totalIncome)}</p>
+                <p className="text-sm text-green-600 flex items-center mt-1">
+                  <TrendingUp className="h-4 w-4 mr-1" />
+                  +12.5% vs last month
+                </p>
               </div>
               <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-green-600" />
+                <DollarSign className="h-6 w-6 text-green-600" />
               </div>
             </div>
           </div>
@@ -194,8 +215,16 @@ export default function TransactionsPage() {
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Expenses</p>
+                <div className="flex items-center mb-2">
+                  <Tooltip content="Money going out - total money your business spent on operations and expenses.">
+                    <p className="text-sm font-medium text-gray-600">Total Expenses</p>
+                  </Tooltip>
+                </div>
                 <p className="text-2xl font-bold text-red-600">{formatCurrency(totalExpenses)}</p>
+                <p className="text-sm text-red-600 flex items-center mt-1">
+                  <TrendingDown className="h-4 w-4 mr-1" />
+                  +8.2% vs last month
+                </p>
               </div>
               <div className="h-12 w-12 bg-red-100 rounded-lg flex items-center justify-center">
                 <TrendingDown className="h-6 w-6 text-red-600" />
@@ -206,13 +235,32 @@ export default function TransactionsPage() {
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Net Cash Flow</p>
-                <p className={`text-2xl font-bold ${totalIncome - totalExpenses >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {formatCurrency(totalIncome - totalExpenses)}
+                <div className="flex items-center mb-2">
+                  <Tooltip content="Money left after paying all expenses. This is your profit.">
+                    <p className="text-sm font-medium text-gray-600">Net Cash Flow</p>
+                  </Tooltip>
+                </div>
+                <p className={`text-2xl font-bold ${netCashFlow >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                  {formatCurrency(netCashFlow)}
+                </p>
+                <p className={`text-sm flex items-center mt-1 ${netCashFlow >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                  {netCashFlow >= 0 ? (
+                    <>
+                      <TrendingUp className="h-4 w-4 mr-1" />
+                      +15.3% vs last month
+                    </>
+                  ) : (
+                    <>
+                      <TrendingDown className="h-4 w-4 mr-1" />
+                      -5.7% vs last month
+                    </>
+                  )}
                 </p>
               </div>
-              <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-blue-600" />
+              <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${
+                netCashFlow >= 0 ? 'bg-blue-100' : 'bg-red-100'
+              }`}>
+                <TrendingUp className={`h-6 w-6 ${netCashFlow >= 0 ? 'text-blue-600' : 'text-red-600'}`} />
               </div>
             </div>
           </div>
@@ -220,7 +268,7 @@ export default function TransactionsPage() {
 
         {/* Filters and Search */}
         <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -233,17 +281,7 @@ export default function TransactionsPage() {
                 />
               </div>
             </div>
-            <div className="flex gap-4">
-              <select
-                value={selectedType}
-                onChange={(e) => setSelectedType(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Types</option>
-                <option value="income">Income</option>
-                <option value="expense">Expense</option>
-                <option value="transfer">Transfer</option>
-              </select>
+            <div className="flex gap-2">
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
@@ -253,9 +291,19 @@ export default function TransactionsPage() {
                 <option value="Income">Income</option>
                 <option value="Expenses">Expenses</option>
                 <option value="Technology">Technology</option>
+                <option value="Marketing">Marketing</option>
               </select>
-              <button className="flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                <Download className="h-4 w-4 mr-2" />
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All Types</option>
+                <option value="income">Income</option>
+                <option value="expense">Expense</option>
+              </select>
+              <button className="flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                <Download className="h-4 w-4 mr-1" />
                 Export
               </button>
             </div>
@@ -263,7 +311,7 @@ export default function TransactionsPage() {
         </div>
 
         {/* Transactions List */}
-        <div className="bg-white rounded-xl shadow-sm">
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900">Recent Transactions</h2>
           </div>
@@ -271,13 +319,11 @@ export default function TransactionsPage() {
           {loading.transactions ? (
             <div className="p-6">
               <div className="animate-pulse space-y-4">
-                {[1, 2, 3].map((i) => (
+                {[...Array(5)].map((_, i) => (
                   <div key={i} className="flex items-center space-x-4">
-                    <div className="h-10 w-10 bg-gray-200 rounded-full"></div>
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                      <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                    </div>
+                    <div className="h-4 bg-gray-200 rounded w-16"></div>
+                    <div className="h-4 bg-gray-200 rounded flex-1"></div>
+                    <div className="h-4 bg-gray-200 rounded w-24"></div>
                     <div className="h-4 bg-gray-200 rounded w-20"></div>
                   </div>
                 ))}
@@ -289,8 +335,7 @@ export default function TransactionsPage() {
             </div>
           ) : filteredTransactions.length === 0 ? (
             <div className="p-6 text-center">
-              <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">No transactions found.</p>
+              <p className="text-gray-500">No transactions found matching your filters.</p>
             </div>
           ) : (
             <div className="divide-y divide-gray-200">
@@ -298,11 +343,17 @@ export default function TransactionsPage() {
                 <div key={transaction.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
-                      <div className="h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center">
-                        {getTypeIcon(transaction.type)}
+                      <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+                        transaction.type === 'income' ? 'bg-green-100' : 'bg-red-100'
+                      }`}>
+                        {transaction.type === 'income' ? (
+                          <DollarSign className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <TrendingDown className="h-5 w-5 text-red-600" />
+                        )}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{transaction.description}</p>
+                        <p className="font-medium text-gray-900">{transaction.description}</p>
                         <div className="flex items-center space-x-2 text-sm text-gray-500">
                           <span>{transaction.category}</span>
                           <span>•</span>
@@ -311,10 +362,12 @@ export default function TransactionsPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className={`text-sm font-medium ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                      <p className={`font-semibold ${
+                        transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
+                      }`}>
                         {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
                       </p>
-                      <p className="text-xs text-gray-500">{transaction.status}</p>
+                      <p className="text-sm text-gray-500 capitalize">{transaction.status}</p>
                     </div>
                   </div>
                 </div>

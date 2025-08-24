@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/store/useStore';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { Tooltip } from '@/components/ui/Tooltip';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -12,7 +13,10 @@ import {
   Calendar,
   RefreshCw,
   PieChart,
-  Activity
+  Activity,
+  Users,
+  ShoppingCart,
+  Target
 } from 'lucide-react';
 
 export default function AnalyticsPage() {
@@ -114,8 +118,8 @@ export default function AnalyticsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
-            <p className="text-gray-600">Deep dive into your financial performance and trends.</p>
+            <h1 className="text-2xl font-bold text-gray-900">Business Analytics</h1>
+            <p className="text-gray-600">Deep dive into your business performance and trends.</p>
           </div>
           <button className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
             <RefreshCw className="h-4 w-4 mr-2" />
@@ -123,12 +127,16 @@ export default function AnalyticsPage() {
           </button>
         </div>
 
-        {/* Analytics Overview Cards */}
+        {/* Key Business Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Revenue</p>
+                <div className="flex items-center mb-2">
+                  <Tooltip content="Money coming in - total money your business earned this month from all sources including sales, services, and other income.">
+                    <p className="text-sm font-medium text-gray-600">Monthly Revenue</p>
+                  </Tooltip>
+                </div>
                 <p className="text-2xl font-bold text-gray-900">{formatCurrency(125000)}</p>
                 <p className="text-sm text-green-600 flex items-center mt-1">
                   <TrendingUp className="h-4 w-4 mr-1" />
@@ -144,7 +152,11 @@ export default function AnalyticsPage() {
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Expenses</p>
+                <div className="flex items-center mb-2">
+                  <Tooltip content="Money going out - total money your business spent on operations, including rent, salaries, supplies, and other expenses.">
+                    <p className="text-sm font-medium text-gray-600">Monthly Expenses</p>
+                  </Tooltip>
+                </div>
                 <p className="text-2xl font-bold text-gray-900">{formatCurrency(85000)}</p>
                 <p className="text-sm text-red-600 flex items-center mt-1">
                   <TrendingDown className="h-4 w-4 mr-1" />
@@ -160,7 +172,11 @@ export default function AnalyticsPage() {
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Net Profit</p>
+                <div className="flex items-center mb-2">
+                  <Tooltip content="Money left after paying all expenses. This is your actual profit that you can reinvest or save.">
+                    <p className="text-sm font-medium text-gray-600">Net Profit</p>
+                  </Tooltip>
+                </div>
                 <p className="text-2xl font-bold text-gray-900">{formatCurrency(40000)}</p>
                 <p className="text-sm text-green-600 flex items-center mt-1">
                   <TrendingUp className="h-4 w-4 mr-1" />
@@ -176,7 +192,11 @@ export default function AnalyticsPage() {
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Avg. Transaction</p>
+                <div className="flex items-center mb-2">
+                  <Tooltip content="Average amount per customer transaction. Higher values mean more revenue per customer.">
+                    <p className="text-sm font-medium text-gray-600">Average Sale Value</p>
+                  </Tooltip>
+                </div>
                 <p className="text-2xl font-bold text-gray-900">{formatCurrency(2500)}</p>
                 <p className="text-sm text-green-600 flex items-center mt-1">
                   <TrendingUp className="h-4 w-4 mr-1" />
@@ -190,12 +210,70 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
+        {/* Small Business Focused Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center mb-2">
+                  <Tooltip content="Number of customers who made purchases this month. Growing this number increases your revenue.">
+                    <p className="text-sm font-medium text-gray-600">Active Customers</p>
+                  </Tooltip>
+                </div>
+                <p className="text-2xl font-bold text-gray-900">24</p>
+                <p className="text-sm text-green-600">+2 new this month</p>
+              </div>
+              <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Users className="h-5 w-5 text-blue-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center mb-2">
+                  <Tooltip content="Percentage of revenue that becomes profit after expenses. Higher margins mean more money in your pocket.">
+                    <p className="text-sm font-medium text-gray-600">Profit Margin</p>
+                  </Tooltip>
+                </div>
+                <p className="text-2xl font-bold text-gray-900">32%</p>
+                <p className="text-sm text-green-600">+2.1% vs last month</p>
+              </div>
+              <div className="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <Target className="h-5 w-5 text-green-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center mb-2">
+                  <Tooltip content="Average time it takes customers to pay their invoices. Shorter periods improve your cash flow.">
+                    <p className="text-sm font-medium text-gray-600">Payment Cycle</p>
+                  </Tooltip>
+                </div>
+                <p className="text-2xl font-bold text-gray-900">12.5 days</p>
+                <p className="text-sm text-green-600">-2.3 days vs last month</p>
+              </div>
+              <div className="h-10 w-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <Calendar className="h-5 w-5 text-yellow-600" />
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Revenue vs Expenses Chart */}
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-gray-900">Revenue vs Expenses</h2>
+              <div className="flex items-center">
+                <Tooltip content="Compare your monthly income vs expenses to see if you're making more than you're spending.">
+                  <h2 className="text-lg font-semibold text-gray-900">Revenue vs Expenses</h2>
+                </Tooltip>
+              </div>
               <select className="text-sm border border-gray-300 rounded-lg px-3 py-1">
                 <option>Last 30 days</option>
                 <option>Last 90 days</option>
@@ -210,7 +288,11 @@ export default function AnalyticsPage() {
           {/* Category Breakdown */}
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-gray-900">Expense Categories</h2>
+              <div className="flex items-center">
+                <Tooltip content="See where your money is going. This helps identify areas where you can cut costs or invest more.">
+                  <h2 className="text-lg font-semibold text-gray-900">Expense Categories</h2>
+                </Tooltip>
+              </div>
               <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
                 View details
               </button>
@@ -219,28 +301,28 @@ export default function AnalyticsPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <div className="h-3 w-3 bg-blue-500 rounded-full mr-3"></div>
-                  <span className="text-sm text-gray-700">Technology</span>
+                  <span className="text-sm text-gray-700">Technology & Software</span>
                 </div>
                 <span className="text-sm font-medium text-gray-900">35%</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <div className="h-3 w-3 bg-green-500 rounded-full mr-3"></div>
-                  <span className="text-sm text-gray-700">Office</span>
+                  <span className="text-sm text-gray-700">Office & Supplies</span>
                 </div>
                 <span className="text-sm font-medium text-gray-900">25%</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <div className="h-3 w-3 bg-yellow-500 rounded-full mr-3"></div>
-                  <span className="text-sm text-gray-700">Marketing</span>
+                  <span className="text-sm text-gray-700">Marketing & Sales</span>
                 </div>
                 <span className="text-sm font-medium text-gray-900">20%</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <div className="h-3 w-3 bg-red-500 rounded-full mr-3"></div>
-                  <span className="text-sm text-gray-700">Other</span>
+                  <span className="text-sm text-gray-700">Other Expenses</span>
                 </div>
                 <span className="text-sm font-medium text-gray-900">20%</span>
               </div>
@@ -248,17 +330,24 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Performance Metrics */}
+        {/* Business Health Score */}
         <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-6">Performance Metrics</h2>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <Tooltip content="Overall health score based on your cash flow, profitability, and business metrics. 80+ is excellent for small businesses.">
+                <h2 className="text-lg font-semibold text-gray-900">Business Health Score</h2>
+              </Tooltip>
+            </div>
+            <div className="text-2xl font-bold text-green-600">85/100</div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center">
               <p className="text-2xl font-bold text-gray-900">85%</p>
-              <p className="text-sm text-gray-600">Profit Margin</p>
+              <p className="text-sm text-gray-600">Cash Flow Health</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-gray-900">12.5</p>
-              <p className="text-sm text-gray-600">Avg. Days to Payment</p>
+              <p className="text-sm text-gray-600">Days to Get Paid</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-gray-900">45</p>
