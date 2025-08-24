@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import ErrorBoundary from '@/components/ui/ErrorBoundary';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import Providers from './providers';
 import { NotificationContainer } from '@/components/ui/Notification';
 

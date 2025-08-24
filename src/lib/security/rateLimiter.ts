@@ -171,10 +171,12 @@ export function withRateLimit(
     // Add rate limit headers to response
     const response = await handler(req, info);
     
-    // Add rate limit headers
-    response.headers.set('X-RateLimit-Limit', info.limit.toString());
-    response.headers.set('X-RateLimit-Remaining', info.remaining.toString());
-    response.headers.set('X-RateLimit-Reset', info.reset.toString());
+    // Add rate limit headers if response exists
+    if (response && response.headers) {
+      response.headers.set('X-RateLimit-Limit', info.limit.toString());
+      response.headers.set('X-RateLimit-Remaining', info.remaining.toString());
+      response.headers.set('X-RateLimit-Reset', info.reset.toString());
+    }
     
     return response;
   };

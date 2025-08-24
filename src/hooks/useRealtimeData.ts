@@ -32,9 +32,32 @@ export function useRealtimeData(): RealtimeDataState & RealtimeDataActions {
     error: null
   });
 
+  // Development mode: bypass Firestore completely
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const skipFirestore = isDevelopment && !process.env.NEXT_PUBLIC_ENABLE_FIRESTORE;
+
   // Real-time transactions listener
   useEffect(() => {
     if (!user?.uid) {
+      setState(prev => ({ ...prev, loading: false, transactions: [] }));
+      return;
+    }
+
+    // Skip Firestore in development mode unless explicitly enabled
+    if (skipFirestore) {
+      console.log('Development mode: Skipping Firestore, using mock data');
+      setState(prev => ({ 
+        ...prev, 
+        loading: false, 
+        transactions: [],
+        error: null 
+      }));
+      return;
+    }
+
+    // Check if Firestore is properly initialized
+    if (!db) {
+      console.warn('Firestore not initialized, using fallback data');
       setState(prev => ({ ...prev, loading: false, transactions: [] }));
       return;
     }
@@ -63,11 +86,22 @@ export function useRealtimeData(): RealtimeDataState & RealtimeDataActions {
       },
       (error) => {
         console.error('Error listening to transactions:', error);
-        setState(prev => ({
-          ...prev,
-          error: 'Failed to load transactions',
-          loading: false
-        }));
+        // Handle Firestore permission issues gracefully
+        if (error.code === 'permission-denied') {
+          console.warn('Firestore permission denied for transactions, using fallback data');
+          setState(prev => ({
+            ...prev,
+            transactions: [],
+            loading: false,
+            error: null
+          }));
+        } else {
+          setState(prev => ({
+            ...prev,
+            error: 'Failed to load transactions',
+            loading: false
+          }));
+        }
       }
     );
 
@@ -77,6 +111,24 @@ export function useRealtimeData(): RealtimeDataState & RealtimeDataActions {
   // Real-time KPIs listener
   useEffect(() => {
     if (!user?.uid) {
+      setState(prev => ({ ...prev, kpis: null }));
+      return;
+    }
+
+    // Skip Firestore in development mode unless explicitly enabled
+    if (skipFirestore) {
+      console.log('Development mode: Skipping Firestore KPIs, using mock data');
+      setState(prev => ({ 
+        ...prev, 
+        kpis: null,
+        error: null 
+      }));
+      return;
+    }
+
+    // Check if Firestore is properly initialized
+    if (!db) {
+      console.warn('Firestore not initialized, using fallback data');
       setState(prev => ({ ...prev, kpis: null }));
       return;
     }
@@ -99,10 +151,20 @@ export function useRealtimeData(): RealtimeDataState & RealtimeDataActions {
       },
       (error) => {
         console.error('Error listening to KPIs:', error);
-        setState(prev => ({
-          ...prev,
-          error: 'Failed to load KPIs'
-        }));
+        // Handle Firestore permission issues gracefully
+        if (error.code === 'permission-denied') {
+          console.warn('Firestore permission denied for KPIs, using fallback data');
+          setState(prev => ({
+            ...prev,
+            kpis: null,
+            error: null
+          }));
+        } else {
+          setState(prev => ({
+            ...prev,
+            error: 'Failed to load KPIs'
+          }));
+        }
       }
     );
 
@@ -112,6 +174,24 @@ export function useRealtimeData(): RealtimeDataState & RealtimeDataActions {
   // Real-time insights listener
   useEffect(() => {
     if (!user?.uid) {
+      setState(prev => ({ ...prev, insights: [] }));
+      return;
+    }
+
+    // Skip Firestore in development mode unless explicitly enabled
+    if (skipFirestore) {
+      console.log('Development mode: Skipping Firestore insights, using mock data');
+      setState(prev => ({ 
+        ...prev, 
+        insights: [],
+        error: null 
+      }));
+      return;
+    }
+
+    // Check if Firestore is properly initialized
+    if (!db) {
+      console.warn('Firestore not initialized, using fallback data');
       setState(prev => ({ ...prev, insights: [] }));
       return;
     }
@@ -139,10 +219,20 @@ export function useRealtimeData(): RealtimeDataState & RealtimeDataActions {
       },
       (error) => {
         console.error('Error listening to insights:', error);
-        setState(prev => ({
-          ...prev,
-          error: 'Failed to load insights'
-        }));
+        // Handle Firestore permission issues gracefully
+        if (error.code === 'permission-denied') {
+          console.warn('Firestore permission denied for insights, using fallback data');
+          setState(prev => ({
+            ...prev,
+            insights: [],
+            error: null
+          }));
+        } else {
+          setState(prev => ({
+            ...prev,
+            error: 'Failed to load insights'
+          }));
+        }
       }
     );
 
@@ -152,6 +242,12 @@ export function useRealtimeData(): RealtimeDataState & RealtimeDataActions {
   // Transaction actions
   const addTransaction = useCallback(async (transactionData: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!user?.uid) throw new Error('User not authenticated');
+
+    // Skip Firestore in development mode
+    if (skipFirestore) {
+      console.log('Development mode: Simulating transaction add');
+      return;
+    }
 
     try {
       const transaction = {
@@ -166,10 +262,16 @@ export function useRealtimeData(): RealtimeDataState & RealtimeDataActions {
       console.error('Error adding transaction:', error);
       throw error;
     }
-  }, [user?.uid]);
+  }, [user?.uid, skipFirestore]);
 
   const updateTransaction = useCallback(async (id: string, updates: Partial<Transaction>) => {
     if (!user?.uid) throw new Error('User not authenticated');
+
+    // Skip Firestore in development mode
+    if (skipFirestore) {
+      console.log('Development mode: Simulating transaction update');
+      return;
+    }
 
     try {
       const transactionRef = doc(db, 'transactions', id);
@@ -181,10 +283,16 @@ export function useRealtimeData(): RealtimeDataState & RealtimeDataActions {
       console.error('Error updating transaction:', error);
       throw error;
     }
-  }, [user?.uid]);
+  }, [user?.uid, skipFirestore]);
 
   const deleteTransaction = useCallback(async (id: string) => {
     if (!user?.uid) throw new Error('User not authenticated');
+
+    // Skip Firestore in development mode
+    if (skipFirestore) {
+      console.log('Development mode: Simulating transaction delete');
+      return;
+    }
 
     try {
       const transactionRef = doc(db, 'transactions', id);
@@ -193,11 +301,17 @@ export function useRealtimeData(): RealtimeDataState & RealtimeDataActions {
       console.error('Error deleting transaction:', error);
       throw error;
     }
-  }, [user?.uid]);
+  }, [user?.uid, skipFirestore]);
 
   // KPI actions
   const updateKPIs = useCallback(async (kpisUpdates: Partial<KPIs>) => {
     if (!user?.uid) throw new Error('User not authenticated');
+
+    // Skip Firestore in development mode
+    if (skipFirestore) {
+      console.log('Development mode: Simulating KPI update');
+      return;
+    }
 
     try {
       const kpisRef = doc(db, 'kpis', user.uid);
@@ -209,7 +323,7 @@ export function useRealtimeData(): RealtimeDataState & RealtimeDataActions {
       console.error('Error updating KPIs:', error);
       throw error;
     }
-  }, [user?.uid]);
+  }, [user?.uid, skipFirestore]);
 
   // Insight actions
   const addInsight = useCallback(async (insightData: Omit<Insight, 'id' | 'createdAt'>) => {

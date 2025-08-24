@@ -8,6 +8,8 @@ import { requireAuth } from '@/lib/security/auth';
 import { withSecurityAndCors } from '@/lib/security/headers';
 import { createRateLimitedAPI, apiRateLimiter } from '@/lib/security/rateLimiter';
 import { validateAIInsightsRequest, sanitizeTransactionInput } from '@/lib/validation/schemas';
+import { handleApiError, ValidationError, DatabaseError } from '@/lib/errors/handler';
+import { monitorApiCall } from '@/lib/performance/monitor';
 
 // Create rate-limited and secured API handler
 const handler = createRateLimitedAPI(apiRateLimiter, async (request: NextRequest) => {
@@ -18,10 +20,9 @@ const handler = createRateLimitedAPI(apiRateLimiter, async (request: NextRequest
       // Validate request data
       const validationResult = validateAIInsightsRequest(body);
       if (!validationResult.success) {
-        return NextResponse.json({
-          error: 'Validation failed',
-          details: validationResult.error.errors
-        }, { status: 400 });
+        throw new ValidationError('Invalid request data', {
+          errors: validationResult.error.errors
+        });
       }
 
       const { transactions, shopifyOrders = [], quickbooksInvoices = [], quickbooksBills = [] } = body;
@@ -37,20 +38,25 @@ const handler = createRateLimitedAPI(apiRateLimiter, async (request: NextRequest
         quickbooksBills
       );
 
-      // Generate insights
-      const insights = generateInsights(sanitizedTransactions, dataAdapter);
+      // Generate insights with performance monitoring
+      const insightsPromise = generateInsights(sanitizedTransactions, dataAdapter);
+      const insights = await monitorApiCall('/api/ai/insights/generate', insightsPromise);
       
-      // Calculate health score
-      const healthScore = calculateFinancialHealthScore(sanitizedTransactions, dataAdapter);
+      // Calculate health score with performance monitoring
+      const healthScorePromise = calculateFinancialHealthScore(sanitizedTransactions, dataAdapter);
+      const healthScore = await monitorApiCall('/api/ai/insights/health-score', healthScorePromise);
       
-      // Analyze trends
-      const trends = analyzeTrends(sanitizedTransactions, dataAdapter);
+      // Analyze trends with performance monitoring
+      const trendsPromise = analyzeTrends(sanitizedTransactions, dataAdapter);
+      const trends = await monitorApiCall('/api/ai/insights/trends', trendsPromise);
       
-      // Assess risks
-      const risks = assessBusinessRisks(sanitizedTransactions, dataAdapter);
+      // Assess risks with performance monitoring
+      const risksPromise = assessBusinessRisks(sanitizedTransactions, dataAdapter);
+      const risks = await monitorApiCall('/api/ai/insights/risks', risksPromise);
       
       // Analyze data sources for adaptive insights
-      const adaptiveStrategy = analyzeDataSourcesForInsights(sanitizedTransactions, dataAdapter);
+      const adaptiveStrategyPromise = analyzeDataSourcesForInsights(sanitizedTransactions, dataAdapter);
+      const adaptiveStrategy = await monitorApiCall('/api/ai/insights/adaptive', adaptiveStrategyPromise);
 
       return NextResponse.json({
         success: true,
@@ -61,11 +67,7 @@ const handler = createRateLimitedAPI(apiRateLimiter, async (request: NextRequest
         adaptiveStrategy
       });
     } catch (error) {
-      console.error('AI Insights API error:', error);
-      return NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      );
+      return handleApiError(error);
     }
   });
 });

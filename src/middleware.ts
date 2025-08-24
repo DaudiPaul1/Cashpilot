@@ -62,21 +62,32 @@ export function middleware(request: NextRequest) {
     'Cross-Origin-Embedder-Policy': 'require-corp',
     'Cross-Origin-Opener-Policy': 'same-origin',
     'Cross-Origin-Resource-Policy': 'same-origin',
-    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
-    'Content-Security-Policy': [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: https: blob:",
-      "connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com",
-      "frame-src 'self'",
-      "object-src 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-      "frame-ancestors 'none'",
-      "upgrade-insecure-requests"
-    ].join('; ')
+             'Strict-Transport-Security': process.env.NODE_ENV === 'development' ? 'max-age=0' : 'max-age=31536000; includeSubDomains; preload',
+               'Content-Security-Policy': process.env.NODE_ENV === 'development' ? [
+             "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:",
+             "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+             "style-src 'self' 'unsafe-inline'",
+             "font-src 'self' data:",
+             "img-src 'self' data: blob:",
+             "connect-src 'self' ws: wss: http: https:",
+             "frame-src 'self'",
+             "object-src 'none'",
+             "base-uri 'self'",
+             "form-action 'self'"
+           ].join('; ') : [
+             "default-src 'self'",
+             "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com",
+             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+             "font-src 'self' https://fonts.gstatic.com",
+             "img-src 'self' data: https: blob:",
+             "connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com",
+             "frame-src 'self'",
+             "object-src 'none'",
+             "base-uri 'self'",
+             "form-action 'self'",
+             "frame-ancestors 'none'",
+             "upgrade-insecure-requests"
+           ].join('; ')
   }).forEach(([key, value]) => {
     response.headers.set(key, value);
   });
