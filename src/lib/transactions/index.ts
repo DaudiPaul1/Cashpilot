@@ -15,3 +15,17 @@ export {
   suggestCategories,
   learnFromUserCategorization
 } from './categorizer';
+
+// Export CSV import functions
+export {
+  parseCSVContent,
+  validateCSVData,
+  convertCSVRowsToTransactions,
+  generateCSVTemplate,
+  processCSVImport,
+  validateCSVFile,
+  readFileAsText,
+  type CSVRow,
+  type ImportResult,
+  type ValidationError
+} from './csvImporter';

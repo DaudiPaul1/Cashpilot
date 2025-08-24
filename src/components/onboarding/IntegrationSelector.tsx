@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/store/useStore';
 import ShopifyConnect from '@/components/integrations/ShopifyConnect';
 import QuickBooksConnect from '@/components/integrations/QuickBooksConnect';
+import ManualSetup from '@/components/onboarding/ManualSetup';
 import { 
   ShoppingBag, 
   Calculator, 
@@ -62,6 +63,7 @@ export default function IntegrationSelector({ onComplete, onSkip }: IntegrationS
   const [selectedIntegration, setSelectedIntegration] = useState<string | null>(null);
   const [showShopifyConnect, setShowShopifyConnect] = useState(false);
   const [showQuickBooksConnect, setShowQuickBooksConnect] = useState(false);
+  const [showManualSetup, setShowManualSetup] = useState(false);
   const [completedIntegrations, setCompletedIntegrations] = useState<string[]>([]);
 
   const handleIntegrationSelect = (integrationId: string) => {
@@ -72,14 +74,7 @@ export default function IntegrationSelector({ onComplete, onSkip }: IntegrationS
     } else if (integrationId === 'quickbooks') {
       setShowQuickBooksConnect(true);
     } else if (integrationId === 'manual') {
-      // For manual entry, we can skip the setup and go directly to the dashboard
-      setCompletedIntegrations(prev => [...prev, 'manual']);
-      addNotification({
-        type: 'success',
-        title: 'Manual Entry Selected',
-        message: 'You can start entering transactions manually. You can always connect integrations later.'
-      });
-      if (onComplete) onComplete();
+      setShowManualSetup(true);
     }
   };
 
@@ -119,6 +114,34 @@ export default function IntegrationSelector({ onComplete, onSkip }: IntegrationS
   const handleQuickBooksClose = () => {
     setShowQuickBooksConnect(false);
     setSelectedIntegration(null);
+  };
+
+  const handleManualSetupComplete = () => {
+    setCompletedIntegrations(prev => [...prev, 'manual']);
+    setShowManualSetup(false);
+    setSelectedIntegration(null);
+    
+    addNotification({
+      type: 'success',
+      title: 'Manual Setup Complete',
+      message: 'You\'re all set to start tracking your finances manually.'
+    });
+    
+    if (onComplete) onComplete();
+  };
+
+  const handleManualSetupSkip = () => {
+    setCompletedIntegrations(prev => [...prev, 'manual']);
+    setShowManualSetup(false);
+    setSelectedIntegration(null);
+    
+    addNotification({
+      type: 'success',
+      title: 'Manual Entry Selected',
+      message: 'You can start entering transactions manually. You can always connect integrations later.'
+    });
+    
+    if (onComplete) onComplete();
   };
 
   const getStatusBadge = (status: IntegrationOption['status']) => {
@@ -171,6 +194,19 @@ export default function IntegrationSelector({ onComplete, onSkip }: IntegrationS
             <X className="h-4 w-4" />
           </button>
           <QuickBooksConnect onSuccess={handleQuickBooksSuccess} onClose={handleQuickBooksClose} />
+        </div>
+      </div>
+    );
+  }
+
+  if (showManualSetup) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="relative bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <ManualSetup 
+            onComplete={handleManualSetupComplete}
+            onSkip={handleManualSetupSkip}
+          />
         </div>
       </div>
     );
