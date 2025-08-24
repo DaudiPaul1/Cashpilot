@@ -1,13 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/store/useStore';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import TransactionList from '@/components/transactions/TransactionList';
-import TransactionFilters from '@/components/transactions/TransactionFilters';
-import AddTransactionModal from '@/components/transactions/AddTransactionModal';
-import { Plus, Download, Filter, Search } from 'lucide-react';
+import { 
+  CreditCard, 
+  Plus, 
+  Filter, 
+  Search, 
+  Download,
+  Calendar,
+  DollarSign,
+  TrendingUp,
+  TrendingDown
+} from 'lucide-react';
 
 export default function TransactionsPage() {
   const { user } = useAuth();
@@ -15,35 +22,25 @@ export default function TransactionsPage() {
     transactions, 
     loading, 
     error,
-    setTransactions,
+    setTransactions, 
     setLoading,
     setError 
   } = useData();
-  
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState({
-    type: '',
-    category: '',
-    dateFrom: '',
-    dateTo: '',
-    minAmount: '',
-    maxAmount: '',
-  });
-  const [sortBy, setSortBy] = useState('date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  // Load transactions
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedType, setSelectedType] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+
+  // Load transactions data
   useEffect(() => {
     if (!user?.uid) return;
 
-    const loadTransactions = async () => {
+    const loadTransactionsData = async () => {
       try {
         setLoading('transactions', true);
         setError('transactions', null);
 
-        // For MVP, we'll use mock data
-        // In production, this would fetch from Firestore
+        // Mock transactions data
         const mockTransactions = [
           {
             id: '1',
@@ -97,33 +94,17 @@ export default function TransactionsPage() {
             id: '4',
             userId: user.uid,
             date: new Date('2024-01-12'),
-            amount: 12000,
+            amount: 18000,
             currency: 'USD',
-            description: 'Consulting Services',
+            description: 'Client Payment - Project Beta',
             category: 'Income',
             type: 'income' as const,
             source: 'manual' as const,
             status: 'completed' as const,
-            tags: ['consulting', 'services'],
+            tags: ['client', 'project'],
             attachments: [],
             createdAt: new Date('2024-01-12'),
             updatedAt: new Date('2024-01-12')
-          },
-          {
-            id: '5',
-            userId: user.uid,
-            date: new Date('2024-01-11'),
-            amount: 800,
-            currency: 'USD',
-            description: 'Marketing Campaign',
-            category: 'Marketing',
-            type: 'expense' as const,
-            source: 'manual' as const,
-            status: 'completed' as const,
-            tags: ['marketing', 'campaign'],
-            attachments: [],
-            createdAt: new Date('2024-01-11'),
-            updatedAt: new Date('2024-01-11')
           }
         ];
 
@@ -138,121 +119,48 @@ export default function TransactionsPage() {
       }
     };
 
-    loadTransactions();
+    loadTransactionsData();
   }, [user?.uid, setTransactions, setLoading, setError]);
 
-  // Filter and sort transactions
-  const filteredTransactions = transactions
-    .filter(transaction => {
-      // Search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        const matchesSearch = 
-          transaction.description.toLowerCase().includes(query) ||
-          transaction.category.toLowerCase().includes(query) ||
-          transaction.tags.some(tag => tag.toLowerCase().includes(query));
-        if (!matchesSearch) return false;
-      }
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
+  };
 
-      // Type filter
-      if (filters.type && transaction.type !== filters.type) return false;
+  const formatDate = (date: Date) => {
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }).format(date);
+  };
 
-      // Category filter
-      if (filters.category && transaction.category !== filters.category) return false;
+  const getTypeIcon = (type: string) => {
+    return type === 'income' ? (
+      <TrendingUp className="h-4 w-4 text-green-600" />
+    ) : (
+      <TrendingDown className="h-4 w-4 text-red-600" />
+    );
+  };
 
-      // Date range filter
-      if (filters.dateFrom) {
-        const fromDate = new Date(filters.dateFrom);
-        if (transaction.date < fromDate) return false;
-      }
-      if (filters.dateTo) {
-        const toDate = new Date(filters.dateTo);
-        if (transaction.date > toDate) return false;
-      }
-
-      // Amount range filter
-      if (filters.minAmount) {
-        const minAmount = parseFloat(filters.minAmount);
-        if (transaction.amount < minAmount) return false;
-      }
-      if (filters.maxAmount) {
-        const maxAmount = parseFloat(filters.maxAmount);
-        if (transaction.amount > maxAmount) return false;
-      }
-
-      return true;
-    })
-    .sort((a, b) => {
-      let comparison = 0;
-      
-      switch (sortBy) {
-        case 'date':
-          comparison = a.date.getTime() - b.date.getTime();
-          break;
-        case 'amount':
-          comparison = a.amount - b.amount;
-          break;
-        case 'description':
-          comparison = a.description.localeCompare(b.description);
-          break;
-        case 'category':
-          comparison = a.category.localeCompare(b.category);
-          break;
-        default:
-          comparison = a.date.getTime() - b.date.getTime();
-      }
-
-      return sortOrder === 'asc' ? comparison : -comparison;
-    });
-
-  const handleAddTransaction = (transaction: any) => {
-    // In production, this would save to Firestore
-    const newTransaction = {
-      ...transaction,
-      id: Date.now().toString(),
-      userId: user?.uid,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
+  const filteredTransactions = transactions.filter(transaction => {
+    const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         transaction.category.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = selectedType === 'all' || transaction.type === selectedType;
+    const matchesCategory = selectedCategory === 'all' || transaction.category === selectedCategory;
     
-    setTransactions([newTransaction, ...transactions]);
-    setShowAddModal(false);
-  };
+    return matchesSearch && matchesType && matchesCategory;
+  });
 
-  const handleDeleteTransaction = (id: string) => {
-    // In production, this would delete from Firestore
-    setTransactions(transactions.filter(t => t.id !== id));
-  };
+  const totalIncome = filteredTransactions
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + t.amount, 0);
 
-  const handleUpdateTransaction = (id: string, updates: any) => {
-    // In production, this would update in Firestore
-    setTransactions(transactions.map(t => 
-      t.id === id ? { ...t, ...updates, updatedAt: new Date() } : t
-    ));
-  };
-
-  const exportTransactions = () => {
-    const csvContent = [
-      ['Date', 'Description', 'Category', 'Type', 'Amount', 'Status', 'Tags'].join(','),
-      ...filteredTransactions.map(t => [
-        t.date.toISOString().split('T')[0],
-        `"${t.description}"`,
-        t.category,
-        t.type,
-        t.amount,
-        t.status,
-        `"${t.tags.join('; ')}"`
-      ].join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `transactions-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
+  const totalExpenses = filteredTransactions
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + t.amount, 0);
 
   return (
     <DashboardLayout>
@@ -261,88 +169,159 @@ export default function TransactionsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
-            <p className="text-gray-600">Manage your income and expenses</p>
+            <p className="text-gray-600">Manage and track your financial transactions.</p>
           </div>
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={exportTransactions}
-              className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </button>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Transaction
-            </button>
+          <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Transaction
+          </button>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Income</p>
+                <p className="text-2xl font-bold text-green-600">{formatCurrency(totalIncome)}</p>
+              </div>
+              <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <TrendingUp className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Expenses</p>
+                <p className="text-2xl font-bold text-red-600">{formatCurrency(totalExpenses)}</p>
+              </div>
+              <div className="h-12 w-12 bg-red-100 rounded-lg flex items-center justify-center">
+                <TrendingDown className="h-6 w-6 text-red-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Net Cash Flow</p>
+                <p className={`text-2xl font-bold ${totalIncome - totalExpenses >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {formatCurrency(totalIncome - totalExpenses)}
+                </p>
+              </div>
+              <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <DollarSign className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Search and Filters */}
+        {/* Filters and Search */}
         <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-            {/* Search */}
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search transactions..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search transactions..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
             </div>
-
-            {/* Sort */}
-            <div className="flex items-center space-x-4">
+            <div className="flex gap-4">
               <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="date">Sort by Date</option>
-                <option value="amount">Sort by Amount</option>
-                <option value="description">Sort by Description</option>
-                <option value="category">Sort by Category</option>
+                <option value="all">All Types</option>
+                <option value="income">Income</option>
+                <option value="expense">Expense</option>
+                <option value="transfer">Transfer</option>
               </select>
-              <button
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                {sortOrder === 'asc' ? '↑' : '↓'}
+                <option value="all">All Categories</option>
+                <option value="Income">Income</option>
+                <option value="Expenses">Expenses</option>
+                <option value="Technology">Technology</option>
+              </select>
+              <button className="flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                <Download className="h-4 w-4 mr-2" />
+                Export
               </button>
             </div>
           </div>
-
-          {/* Filters */}
-          <TransactionFilters
-            filters={filters}
-            onFiltersChange={setFilters}
-          />
         </div>
 
-        {/* Transaction List */}
+        {/* Transactions List */}
         <div className="bg-white rounded-xl shadow-sm">
-          <TransactionList
-            transactions={filteredTransactions}
-            loading={loading.transactions}
-            error={error.transactions}
-            onDelete={handleDeleteTransaction}
-            onUpdate={handleUpdateTransaction}
-          />
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">Recent Transactions</h2>
+          </div>
+          
+          {loading.transactions ? (
+            <div className="p-6">
+              <div className="animate-pulse space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center space-x-4">
+                    <div className="h-10 w-10 bg-gray-200 rounded-full"></div>
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                      <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                    </div>
+                    <div className="h-4 bg-gray-200 rounded w-20"></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : error.transactions ? (
+            <div className="p-6">
+              <p className="text-red-600">Error loading transactions: {error.transactions}</p>
+            </div>
+          ) : filteredTransactions.length === 0 ? (
+            <div className="p-6 text-center">
+              <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500">No transactions found.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-200">
+              {filteredTransactions.map((transaction) => (
+                <div key={transaction.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center">
+                        {getTypeIcon(transaction.type)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{transaction.description}</p>
+                        <div className="flex items-center space-x-2 text-sm text-gray-500">
+                          <span>{transaction.category}</span>
+                          <span>•</span>
+                          <span>{formatDate(transaction.date)}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-sm font-medium ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                        {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                      </p>
+                      <p className="text-xs text-gray-500">{transaction.status}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-
-        {/* Add Transaction Modal */}
-        {showAddModal && (
-          <AddTransactionModal
-            isOpen={showAddModal}
-            onClose={() => setShowAddModal(false)}
-            onAdd={handleAddTransaction}
-          />
-        )}
       </div>
     </DashboardLayout>
   );
