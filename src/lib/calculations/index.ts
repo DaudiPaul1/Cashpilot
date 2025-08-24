@@ -34,3 +34,20 @@ export type {
   TrendAnalysis,
   HealthScoreFactors
 } from '@/types/financial';
+
+// Data Adapters
+export {
+  createDataAdapter,
+  ManualDataAdapter,
+  ShopifyDataAdapter,
+  CombinedDataAdapter
+} from './dataAdapters';
+
+export type {
+  DataAdapter,
+  DataSource,
+  RevenueData,
+  ExpenseData,
+  CustomerData,
+  ProductData
+} from './dataAdapters';

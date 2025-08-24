@@ -9,11 +9,12 @@ import {
   calculateTransactionSummary,
   calculateCategoryBreakdown
 } from './cashFlow';
+import { createDataAdapter, DataAdapter } from './dataAdapters';
 
 /**
  * Calculate all KPIs from transaction data
  */
-export function calculateKPIs(transactions: Transaction[]): KPICalculationResult {
+export function calculateKPIs(transactions: Transaction[], shopifyOrders: any[] = []): KPICalculationResult {
   if (transactions.length === 0) {
     return {
       accountsReceivable: 0,
@@ -48,8 +49,11 @@ export function calculateKPIs(transactions: Transaction[]): KPICalculationResult
   // Calculate monthly recurring revenue
   const monthlyRecurringRevenue = calculateMonthlyRecurringRevenue(transactions);
 
-  // Calculate customer metrics
-  const customerMetrics = calculateCustomerMetrics(transactions);
+  // Create data adapter for flexible calculations
+  const dataAdapter = createDataAdapter(transactions, shopifyOrders);
+  
+  // Calculate customer metrics using data adapter
+  const customerMetrics = calculateCustomerMetricsWithAdapter(dataAdapter);
 
   // Calculate profit margin
   const profitMargin = cashFlowData.income > 0 
@@ -82,48 +86,21 @@ export function calculateKPIs(transactions: Transaction[]): KPICalculationResult
 }
 
 /**
- * Calculate customer-related metrics
+ * Calculate customer-related metrics using data adapter
  */
-function calculateCustomerMetrics(transactions: Transaction[]): {
+function calculateCustomerMetricsWithAdapter(dataAdapter: DataAdapter): {
   activeCustomers: number;
   lifetimeValue: number;
   churnRate: number;
 } {
-  // For now, using simplified calculations
-  // In a real implementation, this would track individual customers
+  // Use data adapter to get customer metrics
+  const customerData = dataAdapter.getCustomerData();
   
-  const now = new Date();
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
-
-  // Count unique customers (simplified - using transaction descriptions)
-  const recentCustomers = new Set(
-    transactions
-      .filter(t => t.type === 'income' && t.date >= thirtyDaysAgo)
-      .map(t => t.description.split(' - ')[0]) // Extract customer name from description
-  );
-
-  const previousCustomers = new Set(
-    transactions
-      .filter(t => t.type === 'income' && t.date >= sixtyDaysAgo && t.date < thirtyDaysAgo)
-      .map(t => t.description.split(' - ')[0])
-  );
-
-  const activeCustomers = recentCustomers.size;
-  const churnedCustomers = Array.from(previousCustomers).filter(
-    customer => !recentCustomers.has(customer)
-  ).length;
-
-  const churnRate = previousCustomers.size > 0 
-    ? (churnedCustomers / previousCustomers.size) * 100 
-    : 0;
-
-  // Calculate average customer lifetime value
-  const totalIncome = transactions
-    .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const lifetimeValue = activeCustomers > 0 ? totalIncome / activeCustomers : 0;
+  return {
+    activeCustomers: customerData.activeCustomers,
+    lifetimeValue: customerData.customerLifetimeValue,
+    churnRate: customerData.churnRate * 100 // Convert to percentage
+  };
 
   return {
     activeCustomers,
