@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { Transaction, AIInsight, KPIs } from '@/types';
-import { processTransaction, updateTransaction, ProcessingResult } from '@/lib/transactions';
 
 // UI State
 interface UIState {
@@ -94,14 +93,6 @@ interface StoreState extends UIState, DashboardState, DataState {
   setLoading: (key: keyof DataState['loading'], loading: boolean) => void;
   setError: (key: keyof DataState['error'], error: string | null) => void;
   clearErrors: () => void;
-
-  // Enhanced Transaction Actions
-  processAndAddTransaction: (transactionInput: any) => Promise<ProcessingResult>;
-  processAndUpdateTransaction: (id: string, updates: any) => Promise<ProcessingResult>;
-  bulkAddTransactions: (transactions: Transaction[]) => void;
-  searchTransactions: (query: string) => Transaction[];
-  getTransactionsByCategory: (category: string) => Transaction[];
-  getTransactionsByDateRange: (startDate: Date, endDate: Date) => Transaction[];
 
   // Utility Actions
   reset: () => void;
@@ -237,83 +228,6 @@ export const useStore = create<StoreState>()(
             },
           }),
 
-        // Enhanced Transaction Actions
-        processAndAddTransaction: async (transactionInput) => {
-          const result = await processTransaction(transactionInput);
-          if (result.success) {
-            set((state) => ({
-              transactions: [result.transaction, ...state.transactions],
-            }));
-            get().addNotification({
-              type: 'success',
-              title: 'Transaction Added',
-              message: `Transaction "${result.transaction.description}" added.`,
-            });
-                     } else {
-             get().addNotification({
-               type: 'error',
-               title: 'Failed to Add Transaction',
-               message: result.errors.join(', ') || 'Unknown error.',
-             });
-           }
-          return result;
-        },
-                 processAndUpdateTransaction: async (id, updates) => {
-           const state = get();
-           const existingTransaction = state.transactions.find(t => t.id === id);
-           if (!existingTransaction) {
-             return { success: false, errors: ['Transaction not found'], warnings: [], transaction: {} as Transaction };
-           }
-           const result = updateTransaction(existingTransaction, updates);
-           if (result.success) {
-             set((state) => ({
-               transactions: state.transactions.map((t) =>
-                 t.id === id ? result.transaction : t
-               ),
-             }));
-             get().addNotification({
-               type: 'success',
-               title: 'Transaction Updated',
-               message: `Transaction "${result.transaction.description}" updated.`,
-             });
-           } else {
-             get().addNotification({
-               type: 'error',
-               title: 'Failed to Update Transaction',
-               message: result.errors.join(', ') || 'Unknown error.',
-             });
-           }
-           return result;
-         },
-        bulkAddTransactions: (transactions) => {
-          set((state) => ({
-            transactions: [...state.transactions, ...transactions],
-          }));
-          get().addNotification({
-            type: 'success',
-            title: 'Bulk Transactions Added',
-            message: `${transactions.length} transactions added.`,
-          });
-        },
-        searchTransactions: (query) => {
-          const lowerCaseQuery = query.toLowerCase();
-          return get().transactions.filter((transaction) => {
-            const descriptionMatch = transaction.description.toLowerCase().includes(lowerCaseQuery);
-            const categoryMatch = transaction.category.toLowerCase().includes(lowerCaseQuery);
-            const typeMatch = transaction.type.toLowerCase().includes(lowerCaseQuery);
-            return descriptionMatch || categoryMatch || typeMatch;
-          });
-        },
-        getTransactionsByCategory: (category) => {
-          return get().transactions.filter((transaction) => transaction.category === category);
-        },
-        getTransactionsByDateRange: (startDate, endDate) => {
-          return get().transactions.filter((transaction) => {
-            const transactionDate = new Date(transaction.date);
-            return transactionDate >= startDate && transactionDate <= endDate;
-          });
-        },
-
         // Utility Actions
         reset: () => set(initialState),
       }),
@@ -409,12 +323,6 @@ export const useData = () => {
   const setLoading = useStore((state) => state.setLoading);
   const setError = useStore((state) => state.setError);
   const clearErrors = useStore((state) => state.clearErrors);
-  const processAndAddTransaction = useStore((state) => state.processAndAddTransaction);
-  const processAndUpdateTransaction = useStore((state) => state.processAndUpdateTransaction);
-  const bulkAddTransactions = useStore((state) => state.bulkAddTransactions);
-  const searchTransactions = useStore((state) => state.searchTransactions);
-  const getTransactionsByCategory = useStore((state) => state.getTransactionsByCategory);
-  const getTransactionsByDateRange = useStore((state) => state.getTransactionsByDateRange);
 
   return {
     transactions,
@@ -433,11 +341,5 @@ export const useData = () => {
     setLoading,
     setError,
     clearErrors,
-    processAndAddTransaction,
-    processAndUpdateTransaction,
-    bulkAddTransactions,
-    searchTransactions,
-    getTransactionsByCategory,
-    getTransactionsByDateRange,
   };
 };

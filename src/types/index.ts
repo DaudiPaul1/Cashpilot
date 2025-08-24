@@ -386,3 +386,5 @@ export type {
   FirestoreRules,
   AppConfig
 };
+// Re-export financial types
+export * from "./financial";

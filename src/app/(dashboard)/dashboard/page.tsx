@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/store/useStore';
+import { calculateKPIs, convertToKPIs } from '@/lib/calculations';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import KPICard from '@/components/dashboard/KPICard';
 import CashFlowChart from '@/components/dashboard/CashFlowChart';
@@ -48,6 +49,9 @@ export default function DashboardPage() {
         setError('insights', null);
 
         // For MVP, we'll use mock data
+        // Calculate KPIs from transaction data using the calculation engine
+        const calculatedKPIs = calculateKPIs(mockTransactions);
+        const kpis = convertToKPIs(calculatedKPIs);
         // In production, this would fetch from Firestore
         const mockKPIs = {
           accountsReceivable: 125000,
@@ -141,7 +145,7 @@ export default function DashboardPage() {
         // Simulate API delay
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        setKPIs(mockKPIs);
+        setKPIs(kpis);
         setTransactions(mockTransactions);
         setInsights(mockInsights);
       } catch (err) {
