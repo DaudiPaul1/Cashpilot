@@ -27,11 +27,11 @@ interface NavigationItem {
 
 const navigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-  { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
-  { name: 'Transactions', href: '/transactions', icon: BanknotesIcon },
-  { name: 'Integrations', href: '/integrations', icon: BuildingOfficeIcon },
-  { name: 'Billing', href: '/billing', icon: CreditCardIcon },
-  { name: 'Settings', href: '/settings', icon: CogIcon },
+  { name: 'Analytics', href: '/dashboard/analytics', icon: ChartBarIcon },
+  { name: 'Transactions', href: '/dashboard/transactions', icon: BanknotesIcon },
+  { name: 'Insights', href: '/dashboard/insights', icon: ChartBarIcon },
+  { name: 'Billing', href: '/dashboard/billing', icon: CreditCardIcon },
+  { name: 'Settings', href: '/dashboard/settings', icon: CogIcon },
 ];
 
 export default function Sidebar() {

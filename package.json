@@ -12,6 +12,7 @@
     "@anthropic-ai/sdk": "^0.18.0",
     "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^3.3.2",
+    "@stripe/stripe-js": "^7.8.0",
     "@tanstack/react-query": "^5.85.5",
     "@tanstack/react-query-devtools": "^5.85.5",
     "axios": "^1.6.2",
@@ -24,6 +25,7 @@
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.48.2",
     "recharts": "^2.8.0",
+    "stripe": "^18.4.0",
     "tailwind-merge": "^2.0.0",
     "zod": "^3.25.76",
     "zustand": "^4.4.7"
