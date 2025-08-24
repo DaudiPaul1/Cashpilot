@@ -14,7 +14,8 @@ import {
   User,
   Bell,
   Search,
-  Plus
+  Plus,
+  ChevronDown
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUI } from '@/store/useStore';
@@ -39,6 +40,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user, userProfile, logout } = useAuth();
   const { sidebarOpen, setSidebarOpen, addNotification } = useUI();
   const [isLoading, setIsLoading] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -61,6 +64,25 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleAddTransaction = () => {
+    addNotification({
+      type: 'info',
+      title: 'Add Transaction',
+      message: 'Transaction form will open here. This feature is coming soon!',
+      duration: 3000,
+    });
+  };
+
+  const handleNotifications = () => {
+    setNotificationsOpen(!notificationsOpen);
+    addNotification({
+      type: 'info',
+      title: 'Notifications',
+      message: 'You have no new notifications.',
+      duration: 3000,
+    });
   };
 
   return (
@@ -188,23 +210,81 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               {/* Right side actions */}
               <div className="flex items-center space-x-4">
                 {/* Add transaction button */}
-                <button className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-colors">
+                <button 
+                  onClick={handleAddTransaction}
+                  className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  title="Add Transaction"
+                >
                   <Plus className="h-5 w-5" />
                 </button>
 
                 {/* Notifications */}
-                <button className="relative p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-                  <Bell className="h-5 w-5" />
-                  <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
-                </button>
+                <div className="relative">
+                  <button 
+                    onClick={handleNotifications}
+                    className="relative p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Notifications"
+                  >
+                    <Bell className="h-5 w-5" />
+                    <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
+                  </button>
+                  
+                  {/* Notifications dropdown */}
+                  {notificationsOpen && (
+                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                      <div className="p-4">
+                        <h3 className="text-sm font-medium text-gray-900 mb-2">Notifications</h3>
+                        <p className="text-sm text-gray-500">You have no new notifications.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* User menu */}
                 <div className="relative">
-                  <button className="flex items-center space-x-2 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                  <button 
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className="flex items-center space-x-2 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="User Menu"
+                  >
                     <div className="h-8 w-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
                       <User className="h-4 w-4 text-white" />
                     </div>
+                    <ChevronDown className="h-4 w-4" />
                   </button>
+                  
+                  {/* User dropdown menu */}
+                  {userMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                      <div className="py-1">
+                        <div className="px-4 py-2 border-b border-gray-100">
+                          <p className="text-sm font-medium text-gray-900">
+                            {userProfile?.displayName || user?.email}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {userProfile?.companyName || 'Company'}
+                          </p>
+                        </div>
+                        <Link
+                          href="/dashboard/settings"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          Settings
+                        </Link>
+                        <button
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            handleLogout();
+                          }}
+                          disabled={isLoading}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                        >
+                          {isLoading ? 'Signing out...' : 'Sign out'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -216,6 +296,17 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </main>
         </div>
       </div>
+      
+      {/* Click outside to close dropdowns */}
+      {(userMenuOpen || notificationsOpen) && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={() => {
+            setUserMenuOpen(false);
+            setNotificationsOpen(false);
+          }}
+        />
+      )}
     </ProtectedRoute>
   );
 }
