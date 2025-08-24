@@ -40,6 +40,7 @@ export {
   createDataAdapter,
   ManualDataAdapter,
   ShopifyDataAdapter,
+  QuickBooksDataAdapter,
   CombinedDataAdapter
 } from './dataAdapters';
 

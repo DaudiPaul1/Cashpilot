@@ -1,5 +1,6 @@
 import { Transaction } from '@/types';
 import { ShopifyOrder } from '@/lib/integrations/shopify';
+import { QuickBooksInvoice, QuickBooksBill } from '@/lib/integrations/quickbooks';
 
 // Data source types
 export type DataSource = 'manual' | 'shopify' | 'quickbooks' | 'combined';
@@ -370,6 +371,276 @@ export class ManualDataAdapter implements DataAdapter {
     });
     
     return periods;
+  }
+}
+
+// QuickBooks data adapter
+export class QuickBooksDataAdapter implements DataAdapter {
+  source: DataSource = 'quickbooks';
+  private transactions: Transaction[];
+  private quickbooksInvoices: QuickBooksInvoice[];
+  private quickbooksBills: QuickBooksBill[];
+
+  constructor(transactions: Transaction[], quickbooksInvoices: QuickBooksInvoice[] = [], quickbooksBills: QuickBooksBill[] = []) {
+    this.transactions = transactions;
+    this.quickbooksInvoices = quickbooksInvoices;
+    this.quickbooksBills = quickbooksBills;
+  }
+
+  getTransactions(): Transaction[] {
+    return this.transactions;
+  }
+
+  getRevenueData(): RevenueData {
+    const quickbooksTransactions = this.transactions.filter(t => t.source === 'quickbooks' && t.type === 'income');
+    const totalRevenue = quickbooksTransactions.reduce((sum, t) => sum + t.amount, 0);
+    
+    // QuickBooks provides better data for recurring revenue detection
+    const recurringRevenue = this.calculateQuickBooksRecurringRevenue();
+    const oneTimeRevenue = totalRevenue - recurringRevenue;
+    
+    const averageOrderValue = quickbooksTransactions.length > 0 
+      ? totalRevenue / quickbooksTransactions.length 
+      : 0;
+
+    return {
+      totalRevenue,
+      recurringRevenue,
+      oneTimeRevenue,
+      averageOrderValue,
+      revenueByPeriod: this.groupByPeriod(quickbooksTransactions),
+      revenueByCategory: this.groupByCategory(quickbooksTransactions)
+    };
+  }
+
+  getExpenseData(): ExpenseData {
+    const quickbooksTransactions = this.transactions.filter(t => t.source === 'quickbooks' && t.type === 'expense');
+    const totalExpenses = quickbooksTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    
+    // QuickBooks provides detailed expense categorization
+    const operatingExpenses = this.calculateOperatingExpenses(quickbooksTransactions);
+    const costOfGoods = this.calculateCostOfGoods(quickbooksTransactions);
+
+    return {
+      totalExpenses,
+      operatingExpenses,
+      costOfGoods,
+      expensesByCategory: this.groupByCategory(quickbooksTransactions),
+      expensesByPeriod: this.groupByPeriod(quickbooksTransactions)
+    };
+  }
+
+  getCustomerData(): CustomerData {
+    const uniqueCustomers = this.quickbooksInvoices
+      .map(invoice => invoice.CustomerRef.value)
+      .filter((id, index, arr) => arr.indexOf(id) === index).length;
+    
+    const activeCustomers = this.getActiveQuickBooksCustomers();
+    const newCustomers = this.getNewQuickBooksCustomers();
+    const customerLifetimeValue = this.calculateQuickBooksCustomerLifetimeValue();
+    const churnRate = this.calculateQuickBooksChurnRate();
+
+    return {
+      totalCustomers: uniqueCustomers,
+      activeCustomers,
+      newCustomers,
+      customerLifetimeValue,
+      churnRate,
+      customersByPeriod: this.getQuickBooksCustomersByPeriod()
+    };
+  }
+
+  getProductData(): ProductData {
+    // QuickBooks doesn't provide product data in the same way as Shopify
+    // We'll extract what we can from invoice line items
+    const productMap = new Map<string, { revenue: number; quantity: number }>();
+    
+    this.quickbooksInvoices.forEach(invoice => {
+      invoice.Line.forEach(line => {
+        if (line.SalesItemLineDetail) {
+          const itemName = line.SalesItemLineDetail.ItemRef.name;
+          const existing = productMap.get(itemName) || { revenue: 0, quantity: 0 };
+          existing.revenue += line.Amount;
+          existing.quantity += line.SalesItemLineDetail.Qty;
+          productMap.set(itemName, existing);
+        }
+      });
+    });
+    
+    const products = Array.from(productMap.entries()).map(([name, data]) => ({
+      name,
+      revenue: data.revenue,
+      quantity: data.quantity
+    }));
+
+    return {
+      totalProducts: products.length,
+      topSellingProducts: products
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 10),
+      productPerformance: products.reduce((acc, product) => {
+        acc[product.name] = {
+          revenue: product.revenue,
+          quantity: product.quantity,
+          margin: 0 // Would need cost data to calculate margin
+        };
+        return acc;
+      }, {} as Record<string, any>)
+    };
+  }
+
+  isDataAvailable(): boolean {
+    return this.transactions.some(t => t.source === 'quickbooks') || 
+           this.quickbooksInvoices.length > 0 || 
+           this.quickbooksBills.length > 0;
+  }
+
+  // QuickBooks-specific helper methods
+  private calculateQuickBooksRecurringRevenue(): number {
+    // Look for subscription-related invoices
+    const subscriptionInvoices = this.quickbooksInvoices.filter(invoice => 
+      invoice.PrivateNote?.toLowerCase().includes('subscription') ||
+      invoice.Line.some(line => 
+        line.Description?.toLowerCase().includes('subscription') ||
+        line.SalesItemLineDetail?.ItemRef.name.toLowerCase().includes('subscription')
+      )
+    );
+    
+    return subscriptionInvoices.reduce((sum, invoice) => sum + invoice.TotalAmt, 0);
+  }
+
+  private calculateOperatingExpenses(transactions: Transaction[]): number {
+    const operatingCategories = [
+      'Office Supplies', 'Rent & Utilities', 'Marketing & Advertising', 
+      'Software & Subscriptions', 'Travel & Meals', 'Insurance', 
+      'Professional Services', 'Other Expenses'
+    ];
+    
+    return transactions
+      .filter(t => operatingCategories.includes(t.category))
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  }
+
+  private calculateCostOfGoods(transactions: Transaction[]): number {
+    const cogsCategories = ['Product Sales', 'Inventory', 'Materials', 'Cost of Goods'];
+    
+    return transactions
+      .filter(t => cogsCategories.includes(t.category))
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  }
+
+  private getActiveQuickBooksCustomers(): number {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const recentInvoices = this.quickbooksInvoices.filter(invoice => 
+      new Date(invoice.TxnDate) >= thirtyDaysAgo
+    );
+    
+    const customerIds = recentInvoices
+      .map(invoice => invoice.CustomerRef.value)
+      .filter((id, index, arr) => arr.indexOf(id) === index);
+    
+    return customerIds.length;
+  }
+
+  private getNewQuickBooksCustomers(): number {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const customerFirstInvoices = new Map<string, Date>();
+    
+    this.quickbooksInvoices.forEach(invoice => {
+      const existing = customerFirstInvoices.get(invoice.CustomerRef.value);
+      const invoiceDate = new Date(invoice.TxnDate);
+      
+      if (!existing || invoiceDate < existing) {
+        customerFirstInvoices.set(invoice.CustomerRef.value, invoiceDate);
+      }
+    });
+    
+    return Array.from(customerFirstInvoices.values())
+      .filter(date => date >= thirtyDaysAgo).length;
+  }
+
+  private calculateQuickBooksCustomerLifetimeValue(): number {
+    const customerRevenue = new Map<string, number>();
+    
+    this.quickbooksInvoices.forEach(invoice => {
+      const existing = customerRevenue.get(invoice.CustomerRef.value) || 0;
+      customerRevenue.set(invoice.CustomerRef.value, existing + invoice.TotalAmt);
+    });
+    
+    const totalRevenue = Array.from(customerRevenue.values()).reduce((sum, revenue) => sum + revenue, 0);
+    const uniqueCustomers = customerRevenue.size;
+    
+    return uniqueCustomers > 0 ? totalRevenue / uniqueCustomers : 0;
+  }
+
+  private calculateQuickBooksChurnRate(): number {
+    const customerLastInvoices = new Map<string, Date>();
+    
+    this.quickbooksInvoices.forEach(invoice => {
+      const existing = customerLastInvoices.get(invoice.CustomerRef.value);
+      const invoiceDate = new Date(invoice.TxnDate);
+      
+      if (!existing || invoiceDate > existing) {
+        customerLastInvoices.set(invoice.CustomerRef.value, invoiceDate);
+      }
+    });
+    
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    
+    const churnedCustomers = Array.from(customerLastInvoices.values())
+      .filter(date => date < ninetyDaysAgo).length;
+    
+    return customerLastInvoices.size > 0 ? churnedCustomers / customerLastInvoices.size : 0;
+  }
+
+  private getQuickBooksCustomersByPeriod(): Record<string, number> {
+    const periods: Record<string, number> = {};
+    
+    this.quickbooksInvoices.forEach(invoice => {
+      const month = new Date(invoice.TxnDate).toISOString().slice(0, 7);
+      const customerId = invoice.CustomerRef.value;
+      
+      if (!periods[month]) periods[month] = 0;
+      if (!periods[`${month}_${customerId}`]) {
+        periods[month]++;
+        periods[`${month}_${customerId}`] = 1;
+      }
+    });
+    
+    // Clean up temporary keys
+    Object.keys(periods).forEach(key => {
+      if (key.includes('_')) {
+        delete periods[key];
+      }
+    });
+    
+    return periods;
+  }
+
+  private groupByPeriod(transactions: Transaction[]): Record<string, number> {
+    const periods: Record<string, number> = {};
+    
+    transactions.forEach(t => {
+      const month = t.date.toISOString().slice(0, 7);
+      periods[month] = (periods[month] || 0) + t.amount;
+    });
+    
+    return periods;
+  }
+
+  private groupByCategory(transactions: Transaction[]): Record<string, number> {
+    const categories: Record<string, number> = {};
+    
+    transactions.forEach(t => {
+      categories[t.category] = (categories[t.category] || 0) + t.amount;
+    });
+    
+    return categories;
   }
 }
 
@@ -763,19 +1034,31 @@ export class CombinedDataAdapter implements DataAdapter {
 // Factory function to create appropriate data adapter
 export function createDataAdapter(
   transactions: Transaction[],
-  shopifyOrders: ShopifyOrder[] = []
+  shopifyOrders: ShopifyOrder[] = [],
+  quickbooksInvoices: QuickBooksInvoice[] = [],
+  quickbooksBills: QuickBooksBill[] = []
 ): DataAdapter {
   const hasShopifyData = transactions.some(t => t.source === 'shopify') || shopifyOrders.length > 0;
+  const hasQuickBooksData = transactions.some(t => t.source === 'quickbooks') || quickbooksInvoices.length > 0 || quickbooksBills.length > 0;
   const hasManualData = transactions.some(t => t.source === 'manual');
   
-  if (hasShopifyData && hasManualData) {
-    return new CombinedDataAdapter([
-      new ShopifyDataAdapter(transactions, shopifyOrders),
-      new ManualDataAdapter(transactions)
-    ]);
-  } else if (hasShopifyData) {
-    return new ShopifyDataAdapter(transactions, shopifyOrders);
+  const adapters: DataAdapter[] = [];
+  
+  if (hasShopifyData) {
+    adapters.push(new ShopifyDataAdapter(transactions, shopifyOrders));
+  }
+  
+  if (hasQuickBooksData) {
+    adapters.push(new QuickBooksDataAdapter(transactions, quickbooksInvoices, quickbooksBills));
+  }
+  
+  if (hasManualData || adapters.length === 0) {
+    adapters.push(new ManualDataAdapter(transactions));
+  }
+  
+  if (adapters.length === 1) {
+    return adapters[0];
   } else {
-    return new ManualDataAdapter(transactions);
+    return new CombinedDataAdapter(adapters);
   }
 }

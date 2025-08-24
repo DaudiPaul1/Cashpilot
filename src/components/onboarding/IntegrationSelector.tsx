@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/store/useStore';
 import ShopifyConnect from '@/components/integrations/ShopifyConnect';
+import QuickBooksConnect from '@/components/integrations/QuickBooksConnect';
 import { 
   ShoppingBag, 
   Calculator, 
@@ -37,7 +38,7 @@ const integrationOptions: IntegrationOption[] = [
     description: 'Sync your accounting data for comprehensive expense tracking and financial reporting.',
     icon: Calculator,
     color: 'blue',
-    status: 'coming-soon'
+    status: 'available'
   },
   {
     id: 'manual',
@@ -60,6 +61,7 @@ export default function IntegrationSelector({ onComplete, onSkip }: IntegrationS
   
   const [selectedIntegration, setSelectedIntegration] = useState<string | null>(null);
   const [showShopifyConnect, setShowShopifyConnect] = useState(false);
+  const [showQuickBooksConnect, setShowQuickBooksConnect] = useState(false);
   const [completedIntegrations, setCompletedIntegrations] = useState<string[]>([]);
 
   const handleIntegrationSelect = (integrationId: string) => {
@@ -67,6 +69,8 @@ export default function IntegrationSelector({ onComplete, onSkip }: IntegrationS
     
     if (integrationId === 'shopify') {
       setShowShopifyConnect(true);
+    } else if (integrationId === 'quickbooks') {
+      setShowQuickBooksConnect(true);
     } else if (integrationId === 'manual') {
       // For manual entry, we can skip the setup and go directly to the dashboard
       setCompletedIntegrations(prev => [...prev, 'manual']);
@@ -95,6 +99,25 @@ export default function IntegrationSelector({ onComplete, onSkip }: IntegrationS
 
   const handleShopifyClose = () => {
     setShowShopifyConnect(false);
+    setSelectedIntegration(null);
+  };
+
+  const handleQuickBooksSuccess = (companyInfo: any) => {
+    setCompletedIntegrations(prev => [...prev, 'quickbooks']);
+    setShowQuickBooksConnect(false);
+    setSelectedIntegration(null);
+    
+    addNotification({
+      type: 'success',
+      title: 'QuickBooks Connected',
+      message: `Successfully connected to ${companyInfo.CompanyName}. Your accounting data is now syncing.`
+    });
+    
+    if (onComplete) onComplete();
+  };
+
+  const handleQuickBooksClose = () => {
+    setShowQuickBooksConnect(false);
     setSelectedIntegration(null);
   };
 
@@ -132,6 +155,22 @@ export default function IntegrationSelector({ onComplete, onSkip }: IntegrationS
             <X className="h-4 w-4" />
           </button>
           <ShopifyConnect onSuccess={handleShopifySuccess} onClose={handleShopifyClose} />
+        </div>
+      </div>
+    );
+  }
+
+  if (showQuickBooksConnect) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="relative">
+          <button
+            onClick={handleQuickBooksClose}
+            className="absolute -top-2 -right-2 h-8 w-8 bg-white rounded-full shadow-lg flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors z-10"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <QuickBooksConnect onSuccess={handleQuickBooksSuccess} onClose={handleQuickBooksClose} />
         </div>
       </div>
     );
