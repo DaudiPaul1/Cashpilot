@@ -323,6 +323,7 @@ export default function InsightsPage() {
                           <input
                             type="checkbox"
                             checked={action.completed}
+                            readOnly
                             className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 mt-0.5"
                           />
                           <div className="flex-1">
