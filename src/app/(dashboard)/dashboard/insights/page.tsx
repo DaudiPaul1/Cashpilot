@@ -16,7 +16,11 @@ import {
   Zap,
   DollarSign,
   Users,
-  Calendar
+  Calendar,
+  Brain,
+  Activity,
+  Shield,
+  BarChart3
 } from 'lucide-react';
 
 export default function InsightsPage() {
@@ -27,23 +31,135 @@ export default function InsightsPage() {
     error,
     setInsights, 
     setLoading,
-    setError 
+    setError,
+    transactions
   } = useData();
+
+  // Transform AI insights to match our format
+  const transformAIInsights = (aiInsights: any, healthScore: any, trends: any, risks: any) => {
+    const transformed: any[] = [];
+    
+    // Add health score insight
+    if (healthScore) {
+      transformed.push({
+        id: 'health-score',
+        userId: user?.uid,
+        type: 'health_score' as const,
+        title: `Financial Health Score: ${healthScore.overall}/100`,
+        content: `Your business has a ${healthScore.overall}/100 financial health score. ${healthScore.factors.positive.length > 0 ? 'Strengths: ' + healthScore.factors.positive.join(', ') : ''} ${healthScore.factors.negative.length > 0 ? 'Areas for improvement: ' + healthScore.factors.negative.join(', ') : ''}`,
+        score: healthScore.overall,
+        priority: healthScore.overall > 80 ? 'low' : healthScore.overall > 60 ? 'medium' : 'high',
+        actionable: healthScore.factors.recommendations.length > 0,
+        actionItems: healthScore.factors.recommendations.map((rec: string, index: number) => ({
+          id: `health-${index}`,
+          title: rec,
+          description: rec,
+          completed: false
+        })),
+        metadata: healthScore.categories,
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      });
+    }
+    
+    // Add AI-generated insights
+    aiInsights.insights.forEach((insight: any, index: number) => {
+      transformed.push({
+        id: `ai-${index}`,
+        userId: user?.uid,
+        type: insight.category as any,
+        title: insight.title,
+        content: insight.description,
+        score: insight.confidence,
+        priority: insight.impact === 'high' ? 'high' : insight.impact === 'medium' ? 'medium' : 'low',
+        actionable: insight.actionable,
+        actionItems: insight.actionItems ? insight.actionItems.map((action: string, actionIndex: number) => ({
+          id: `action-${index}-${actionIndex}`,
+          title: action,
+          description: action,
+          completed: false
+        })) : [],
+        metadata: insight.data || {},
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      });
+    });
+    
+    // Add risk assessment
+    if (risks && risks.level !== 'low') {
+      transformed.push({
+        id: 'risk-assessment',
+        userId: user?.uid,
+        type: 'risk_assessment' as const,
+        title: `${risks.level.charAt(0).toUpperCase() + risks.level.slice(1)} Risk Level Detected`,
+        content: `Your business has ${risks.level} risk factors. ${risks.recommendations.join(' ')}`,
+        score: risks.level === 'critical' ? 20 : risks.level === 'high' ? 40 : 60,
+        priority: risks.level === 'critical' ? 'critical' : 'high',
+        actionable: risks.recommendations.length > 0,
+        actionItems: risks.recommendations.map((rec: string, index: number) => ({
+          id: `risk-${index}`,
+          title: rec,
+          description: rec,
+          completed: false
+        })),
+        metadata: risks.factors,
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      });
+    }
+    
+    return transformed;
+  };
 
   // Load insights data
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid || !transactions) return;
 
     const loadInsightsData = async () => {
       try {
         setLoading('insights', true);
         setError('insights', null);
 
-        // Mock insights data tailored for small businesses
+        // Get auth token for API call
+        const token = await user.getIdToken();
+        
+        // Call AI insights API
+        const response = await fetch('/api/ai/insights', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            transactions,
+            shopifyOrders: [],
+            quickbooksInvoices: [],
+            quickbooksBills: []
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to generate insights');
+        }
+
+        const data = await response.json();
+        
+        if (data.success) {
+          // Transform AI insights to match our format
+          const transformedInsights = transformAIInsights(data.insights, data.healthScore, data.trends, data.risks);
+          setInsights(transformedInsights);
+        } else {
+          throw new Error(data.error || 'Failed to generate insights');
+        }
+      } catch (err) {
+        console.error('Error loading insights:', err);
+        setError('insights', 'Failed to load insights');
+        
+        // Fallback to mock data if API fails
         const mockInsights = [
           {
             id: '1',
-            userId: user.uid,
+            userId: user?.uid,
             type: 'health_score' as const,
             title: 'Strong Financial Health',
             content: 'Your business is making more money than it\'s spending. Consider investing in marketing or new equipment to grow faster.',
@@ -70,112 +186,17 @@ export default function InsightsPage() {
             },
             createdAt: new Date(),
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-          },
-          {
-            id: '2',
-            userId: user.uid,
-            type: 'expense_optimization' as const,
-            title: 'High Technology Expenses',
-            content: 'You\'re spending 35% of your budget on technology. Some software might be unused or overpriced.',
-            score: 65,
-            priority: 'medium' as const,
-            actionable: true,
-            actionItems: [
-              {
-                id: '3',
-                title: 'Audit software subscriptions',
-                description: 'Cancel unused tools and negotiate better rates for essential software',
-                completed: false
-              },
-              {
-                id: '4',
-                title: 'Consider annual billing',
-                description: 'Switch to annual plans to save 10-20% on software costs',
-                completed: false
-              }
-            ],
-            metadata: {
-              category: 'Technology',
-              percentage: 35
-            },
-            createdAt: new Date(),
-            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-          },
-          {
-            id: '3',
-            userId: user.uid,
-            type: 'growth_opportunity' as const,
-            title: 'Excellent Payment Cycle',
-            content: 'Your customers pay quickly (12.5 days average). This is excellent! Consider offering payment plans to increase sales.',
-            score: 90,
-            priority: 'high' as const,
-            actionable: true,
-            actionItems: [
-              {
-                id: '5',
-                title: 'Offer payment plans',
-                description: 'Introduce 3-month payment plans to increase average order value',
-                completed: false
-              },
-              {
-                id: '6',
-                title: 'Ask for referrals',
-                description: 'Your happy customers can bring in new business - ask them for referrals',
-                completed: false
-              }
-            ],
-            metadata: {
-              paymentCycle: 12.5,
-              growthPotential: 'high'
-            },
-            createdAt: new Date(),
-            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-          },
-          {
-            id: '4',
-            userId: user.uid,
-            type: 'payment_reminder' as const,
-            title: 'Invoice Follow-up Required',
-            content: 'You have $15,000 in overdue invoices. Following up on these can improve your cash flow immediately.',
-            score: 75,
-            priority: 'high' as const,
-            actionable: true,
-            actionItems: [
-              {
-                id: '7',
-                title: 'Send payment reminders',
-                description: 'Contact customers with overdue invoices (30+ days)',
-                completed: false
-              },
-              {
-                id: '8',
-                title: 'Review payment terms',
-                description: 'Consider shorter payment terms (15 days instead of 30)',
-                completed: false
-              }
-            ],
-            metadata: {
-              overdueAmount: 15000,
-              overdueCount: 3
-            },
-            createdAt: new Date(),
-            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
           }
         ];
 
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
         setInsights(mockInsights);
-      } catch (err) {
-        setError('insights', 'Failed to load insights');
       } finally {
         setLoading('insights', false);
       }
     };
 
     loadInsightsData();
-  }, [user?.uid, setInsights, setLoading, setError]);
+  }, [user?.uid, transactions, setInsights, setLoading, setError]);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
