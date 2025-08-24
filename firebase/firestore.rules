@@ -1,44 +1,67 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper functions
+    // =====================================================
+    // HELPER FUNCTIONS
+    // =====================================================
+    
+    // Check if user is authenticated
     function isAuthenticated() {
       return request.auth != null;
     }
     
+    // Check if user owns the document
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
     
+    // Check if user is admin (for system-wide operations)
     function isAdmin() {
       return isAuthenticated() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
+    // Validate user profile data structure
     function isValidUserProfile() {
       let profile = request.resource.data;
-      return profile.keys().hasAll(['uid', 'email', 'displayName', 'companyName', 'role', 'subscription', 'integrations', 'settings', 'createdAt', 'updatedAt']) &&
+      return profile.keys().hasAll([
+        'uid', 'email', 'displayName', 'companyName', 'role', 
+        'subscription', 'integrations', 'settings', 'createdAt', 'updatedAt'
+      ]) &&
         profile.uid is string &&
         profile.email is string &&
         profile.displayName is string &&
         profile.companyName is string &&
         profile.role in ['admin', 'user'] &&
         profile.subscription is map &&
+        profile.subscription.keys().hasAll(['plan', 'status', 'startDate', 'endDate']) &&
+        profile.subscription.plan in ['free', 'starter', 'professional', 'enterprise'] &&
+        profile.subscription.status in ['active', 'inactive', 'cancelled', 'past_due'] &&
         profile.integrations is map &&
         profile.settings is map &&
+        profile.settings.keys().hasAll(['currency', 'timezone', 'notifications']) &&
+        profile.settings.currency in ['USD', 'EUR', 'GBP', 'CAD'] &&
         profile.createdAt is timestamp &&
         profile.updatedAt is timestamp;
     }
     
+    // Validate transaction data structure
     function isValidTransaction() {
       let transaction = request.resource.data;
-      return transaction.keys().hasAll(['userId', 'date', 'amount', 'currency', 'description', 'category', 'type', 'source', 'status', 'tags', 'attachments', 'createdAt', 'updatedAt']) &&
+      return transaction.keys().hasAll([
+        'userId', 'date', 'amount', 'currency', 'description', 
+        'category', 'type', 'source', 'status', 'tags', 
+        'attachments', 'createdAt', 'updatedAt'
+      ]) &&
         transaction.userId is string &&
         transaction.date is timestamp &&
         transaction.amount is number &&
+        transaction.amount > 0 &&
         transaction.currency is string &&
+        transaction.currency in ['USD', 'EUR', 'GBP', 'CAD'] &&
         transaction.description is string &&
+        transaction.description.size() > 0 &&
         transaction.category is string &&
         transaction.type in ['income', 'expense', 'transfer'] &&
         transaction.source in ['manual', 'shopify', 'quickbooks', 'plaid'] &&
@@ -49,9 +72,13 @@ service cloud.firestore {
         transaction.updatedAt is timestamp;
     }
     
+    // Validate KPI data structure
     function isValidKPIs() {
       let kpis = request.resource.data;
-      return kpis.keys().hasAll(['accountsReceivable', 'accountsPayable', 'netCashFlow', 'cashRunway', 'lastUpdated']) &&
+      return kpis.keys().hasAll([
+        'accountsReceivable', 'accountsPayable', 'netCashFlow', 
+        'cashRunway', 'lastUpdated'
+      ]) &&
         kpis.accountsReceivable is number &&
         kpis.accountsPayable is number &&
         kpis.netCashFlow is number &&
@@ -59,13 +86,19 @@ service cloud.firestore {
         kpis.lastUpdated is timestamp;
     }
     
+    // Validate insight data structure
     function isValidInsight() {
       let insight = request.resource.data;
-      return insight.keys().hasAll(['userId', 'type', 'title', 'content', 'score', 'priority', 'actionable', 'actionItems', 'metadata', 'createdAt']) &&
+      return insight.keys().hasAll([
+        'userId', 'type', 'title', 'content', 'score', 
+        'priority', 'actionable', 'actionItems', 'metadata', 'createdAt'
+      ]) &&
         insight.userId is string &&
         insight.type in ['health_score', 'payment_reminder', 'expense_optimization', 'growth_opportunity'] &&
         insight.title is string &&
+        insight.title.size() > 0 &&
         insight.content is string &&
+        insight.content.size() > 0 &&
         insight.score is number &&
         insight.score >= 0 && insight.score <= 100 &&
         insight.priority in ['low', 'medium', 'high', 'critical'] &&
@@ -74,116 +107,254 @@ service cloud.firestore {
         insight.metadata is map &&
         insight.createdAt is timestamp;
     }
+    
+    // Validate integration data structure
+    function isValidIntegration() {
+      let integration = request.resource.data;
+      return integration.keys().hasAll([
+        'userId', 'provider', 'accessToken', 'refreshToken', 
+        'expiresAt', 'metadata', 'isActive', 'createdAt', 'updatedAt'
+      ]) &&
+        integration.userId is string &&
+        integration.provider in ['plaid', 'quickbooks', 'shopify', 'stripe'] &&
+        integration.accessToken is string &&
+        integration.accessToken.size() > 0 &&
+        integration.refreshToken is string &&
+        integration.expiresAt is timestamp &&
+        integration.metadata is map &&
+        integration.isActive is bool &&
+        integration.createdAt is timestamp &&
+        integration.updatedAt is timestamp;
+    }
+    
+    // Check if user has active subscription
+    function hasActiveSubscription() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscription.status == 'active';
+    }
+    
+    // Check if user has specific subscription plan
+    function hasSubscriptionPlan(plan) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscription.plan == plan &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscription.status == 'active';
+    }
+    
+    // Rate limiting helper (basic implementation)
+    function isWithinRateLimit() {
+      return true; // Implement rate limiting logic here if needed
+    }
 
-    // User profiles - users can only access their own profile
+    // =====================================================
+    // USER PROFILES
+    // =====================================================
     match /users/{userId} {
-      allow read, write: if isAuthenticated() && isOwner(userId);
-      allow create: if isAuthenticated() && isOwner(userId) && isValidUserProfile();
-      allow update: if isAuthenticated() && isOwner(userId) && isValidUserProfile();
-      allow delete: if false; // Don't allow user deletion for MVP
+      // Users can only access their own profile
+      allow read: if isAuthenticated() && isOwner(userId);
+      
+      // Users can create their own profile during registration
+      allow create: if isAuthenticated() && 
+        isOwner(userId) && 
+        isValidUserProfile() &&
+        isWithinRateLimit();
+      
+      // Users can update their own profile
+      allow update: if isAuthenticated() && 
+        isOwner(userId) && 
+        isValidUserProfile() &&
+        isWithinRateLimit();
+      
+      // Prevent deletion of user profiles
+      allow delete: if false;
     }
     
-    // Transactions - users can only access their own transactions
+    // =====================================================
+    // TRANSACTIONS (Highly Sensitive Financial Data)
+    // =====================================================
     match /transactions/{transactionId} {
-      allow read, write: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid;
+      // Users can only access their own transactions
+      allow read: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid &&
+        hasActiveSubscription();
+      
+      // Users can create their own transactions
       allow create: if isAuthenticated() && 
         request.resource.data.userId == request.auth.uid && 
-        isValidTransaction();
+        isValidTransaction() &&
+        hasActiveSubscription() &&
+        isWithinRateLimit();
+      
+      // Users can update their own transactions
       allow update: if isAuthenticated() && 
         resource.data.userId == request.auth.uid && 
         request.resource.data.userId == request.auth.uid && 
-        isValidTransaction();
+        isValidTransaction() &&
+        hasActiveSubscription() &&
+        isWithinRateLimit();
+      
+      // Users can delete their own transactions
       allow delete: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid;
+        resource.data.userId == request.auth.uid &&
+        hasActiveSubscription();
     }
     
-    // KPIs - users can only access their own KPIs
+    // =====================================================
+    // KPIs (Key Performance Indicators)
+    // =====================================================
     match /kpis/{userId} {
-      allow read, write: if isAuthenticated() && isOwner(userId);
-      allow create: if isAuthenticated() && isOwner(userId) && isValidKPIs();
-      allow update: if isAuthenticated() && isOwner(userId) && isValidKPIs();
-      allow delete: if false; // Don't allow KPI deletion for MVP
+      // Users can only access their own KPIs
+      allow read: if isAuthenticated() && 
+        isOwner(userId) &&
+        hasActiveSubscription();
+      
+      // Users can create their own KPIs
+      allow create: if isAuthenticated() && 
+        isOwner(userId) && 
+        isValidKPIs() &&
+        hasActiveSubscription();
+      
+      // Users can update their own KPIs
+      allow update: if isAuthenticated() && 
+        isOwner(userId) && 
+        isValidKPIs() &&
+        hasActiveSubscription();
+      
+      // Prevent deletion of KPIs
+      allow delete: if false;
     }
     
-    // AI Insights - users can only access their own insights
+    // =====================================================
+    // AI INSIGHTS
+    // =====================================================
     match /insights/{insightId} {
-      allow read, write: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid;
+      // Users can only access their own insights
+      allow read: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid &&
+        hasActiveSubscription();
+      
+      // Users can create their own insights
       allow create: if isAuthenticated() && 
         request.resource.data.userId == request.auth.uid && 
-        isValidInsight();
+        isValidInsight() &&
+        hasActiveSubscription() &&
+        isWithinRateLimit();
+      
+      // Users can update their own insights
       allow update: if isAuthenticated() && 
         resource.data.userId == request.auth.uid && 
         request.resource.data.userId == request.auth.uid && 
-        isValidInsight();
+        isValidInsight() &&
+        hasActiveSubscription() &&
+        isWithinRateLimit();
+      
+      // Users can delete their own insights
       allow delete: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid;
+        resource.data.userId == request.auth.uid &&
+        hasActiveSubscription();
     }
     
-    // Cash flow forecasts - users can only access their own forecasts
-    match /forecasts/{forecastId} {
-      allow read, write: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated() && 
-        request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid && 
-        request.resource.data.userId == request.auth.uid;
-      allow delete: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid;
-    }
-    
-    // Financial health scores - users can only access their own scores
-    match /health-scores/{scoreId} {
-      allow read, write: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated() && 
-        request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid && 
-        request.resource.data.userId == request.auth.uid;
-      allow delete: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid;
-    }
-    
-    // Integration settings - users can only access their own integrations
+    // =====================================================
+    // INTEGRATIONS (OAuth Tokens - Highly Sensitive)
+    // =====================================================
     match /integrations/{integrationId} {
-      allow read, write: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid;
+      // Users can only access their own integrations
+      allow read: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid &&
+        hasActiveSubscription();
+      
+      // Users can create their own integrations
       allow create: if isAuthenticated() && 
-        request.resource.data.userId == request.auth.uid;
+        request.resource.data.userId == request.auth.uid && 
+        isValidIntegration() &&
+        hasActiveSubscription() &&
+        isWithinRateLimit();
+      
+      // Users can update their own integrations
       allow update: if isAuthenticated() && 
         resource.data.userId == request.auth.uid && 
-        request.resource.data.userId == request.auth.uid;
+        request.resource.data.userId == request.auth.uid && 
+        isValidIntegration() &&
+        hasActiveSubscription() &&
+        isWithinRateLimit();
+      
+      // Users can delete their own integrations
       allow delete: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid;
+        resource.data.userId == request.auth.uid &&
+        hasActiveSubscription();
     }
     
-    // Dashboard widgets - users can only access their own widgets
-    match /widgets/{widgetId} {
-      allow read, write: if isAuthenticated() && 
+    // =====================================================
+    // SUBSCRIPTIONS (Payment Data)
+    // =====================================================
+    match /subscriptions/{subscriptionId} {
+      // Users can only access their own subscriptions
+      allow read: if isAuthenticated() && 
         resource.data.userId == request.auth.uid;
+      
+      // Only allow creation through Stripe webhooks
+      allow create: if false;
+      
+      // Only allow updates through Stripe webhooks
+      allow update: if false;
+      
+      // Prevent deletion
+      allow delete: if false;
+    }
+    
+    // =====================================================
+    // ANALYTICS & REPORTS
+    // =====================================================
+    match /analytics/{userId}/{document=**} {
+      // Users can only access their own analytics
+      allow read: if isAuthenticated() && 
+        isOwner(userId) &&
+        hasActiveSubscription();
+      
+      // Users can create their own analytics
       allow create: if isAuthenticated() && 
-        request.resource.data.userId == request.auth.uid;
+        isOwner(userId) &&
+        hasActiveSubscription();
+      
+      // Users can update their own analytics
       allow update: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid && 
-        request.resource.data.userId == request.auth.uid;
+        isOwner(userId) &&
+        hasActiveSubscription();
+      
+      // Users can delete their own analytics
       allow delete: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid;
+        isOwner(userId) &&
+        hasActiveSubscription();
     }
     
-    // System settings - only admins can access
+    // =====================================================
+    // SYSTEM SETTINGS (Admin Only)
+    // =====================================================
     match /system/{document=**} {
+      // Only admins can access system settings
       allow read, write: if isAdmin();
     }
     
-    // Analytics data - users can only access their own analytics
-    match /analytics/{userId}/{document=**} {
-      allow read, write: if isAuthenticated() && isOwner(userId);
+    // =====================================================
+    // WEBHOOK LOGS (Admin Only)
+    // =====================================================
+    match /webhooks/{document=**} {
+      // Only admins can access webhook logs
+      allow read, write: if isAdmin();
     }
     
-    // Deny all other access
+    // =====================================================
+    // AUDIT LOGS (Admin Only)
+    // =====================================================
+    match /audit/{document=**} {
+      // Only admins can access audit logs
+      allow read, write: if isAdmin();
+    }
+    
+    // =====================================================
+    // DENY ALL OTHER ACCESS
+    // =====================================================
     match /{document=**} {
       allow read, write: if false;
     }
